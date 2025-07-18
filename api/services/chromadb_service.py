@@ -23,9 +23,21 @@ class ChromaDBService:
             settings=Settings(anonymized_telemetry=False)
         )
         
-        self.collection = self.client.get_collection(
-            name=settings.chroma_collection_name
-        )
+        try:
+            self.collection = self.client.get_collection(
+                name=settings.chroma_collection_name
+            )
+            logger.info(f"Found existing collection: {settings.chroma_collection_name}")
+        except ValueError:
+            # La colección no existe, crearla vacía
+            logger.warning(f"Collection {settings.chroma_collection_name} not found, creating new one")
+            self.collection = self.client.create_collection(
+                name=settings.chroma_collection_name,
+                embedding_function=OpenAIEmbeddings(
+                    openai_api_key=settings.openai_api_key,
+                    model="text-embedding-3-small"
+                )
+            )
         
         self.embeddings = OpenAIEmbeddings(
             openai_api_key=settings.openai_api_key,
