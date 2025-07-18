@@ -75,23 +75,40 @@ class APIClient:
         """Generate new nutritional plan (Motor 1)."""
         logger.info("Generating new nutritional plan")
         
-        # Prepare request data
+        # Prepare request data - convert to API format
+        # Convert gender from M/F to male/female
+        gender = "male" if patient_data['gender'] == 'M' else "female"
+        
+        # Map activity levels from Spanish to English
+        activity_map = {
+            'sedentario': 'sedentary',
+            'ligera': 'light',
+            'moderada': 'moderate',
+            'intensa': 'active',
+            'muy_intensa': 'very_active'
+        }
+        activity_level = activity_map.get(patient_data['physical_activity'], 'moderate')
+        
+        # Convert pathologies, allergies, etc. from string to list
+        def string_to_list(value):
+            if not value or value.lower() in ['ninguno', 'ninguna', 'no']:
+                return []
+            return [item.strip() for item in value.split(',')]
+        
         request_data = {
-            "patient_info": {
-                "name": patient_data['name'],
-                "age": patient_data['age'],
-                "gender": patient_data['gender'],
-                "height": patient_data['height'],
-                "weight": patient_data['weight'],
-                "physical_activity": patient_data['physical_activity'],
-                "pathologies": patient_data.get('pathologies', 'Ninguna'),
-                "allergies": patient_data.get('allergies', 'Ninguna'),
-                "preferences": patient_data.get('preferences', 'Ninguna'),
-                "dislikes": patient_data.get('dislikes', 'Ninguna'),
-                "meals_per_day": patient_data['meals_per_day'],
-                "economic_level": patient_data.get('economic_level', 'standard')
-            },
-            "days": patient_data['days_requested']
+            "name": patient_data['name'],
+            "age": patient_data['age'],
+            "gender": gender,
+            "height": patient_data['height'],
+            "weight": patient_data['weight'],
+            "activity_level": activity_level,
+            "pathologies": string_to_list(patient_data.get('pathologies', '')),
+            "allergies": string_to_list(patient_data.get('allergies', '')),
+            "food_preferences": string_to_list(patient_data.get('preferences', '')),
+            "food_dislikes": string_to_list(patient_data.get('dislikes', '')),
+            "meals_per_day": patient_data['meals_per_day'],
+            "days_requested": patient_data['days_requested'],
+            "economic_level": patient_data.get('economic_level', 'standard')
         }
         
         response = await self._make_request('POST', '/api/v1/motor1/generate-plan', data=request_data)
