@@ -7,6 +7,7 @@ from typing import Dict, Any
 import logging
 from datetime import datetime
 import uuid
+from pathlib import Path
 
 from api.models.patient import PatientData
 from api.services.chromadb_service import ChromaDBService
@@ -95,12 +96,35 @@ async def get_plan_details(plan_id: str) -> Dict[str, Any]:
 @router.get("/plan/{plan_id}/pdf")
 async def get_plan_pdf(plan_id: str):
     """Download the PDF for a generated plan"""
-    # TODO: Implement PDF retrieval
-    return {
-        "plan_id": plan_id,
-        "status": "not_implemented",
-        "message": "PDF retrieval will be implemented with storage service"
-    }
+    from fastapi.responses import FileResponse
+    import os
+    
+    # Construct the expected PDF filename
+    pdf_directory = Path(settings.pdf_output_directory)
+    
+    # Look for PDF files that start with the plan_id
+    matching_files = list(pdf_directory.glob(f"{plan_id}_*.pdf"))
+    
+    if not matching_files:
+        logger.error(f"PDF not found for plan_id: {plan_id}")
+        raise HTTPException(status_code=404, detail="PDF not found for this plan")
+    
+    # Use the first matching file
+    pdf_path = matching_files[0]
+    
+    if not pdf_path.exists():
+        logger.error(f"PDF file does not exist: {pdf_path}")
+        raise HTTPException(status_code=404, detail="PDF file not found")
+    
+    # Return the PDF file
+    return FileResponse(
+        path=str(pdf_path),
+        media_type="application/pdf",
+        filename=pdf_path.name,
+        headers={
+            "Content-Disposition": f"attachment; filename={pdf_path.name}"
+        }
+    )
 
 
 @router.post("/validate-patient")

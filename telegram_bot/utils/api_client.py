@@ -169,6 +169,41 @@ class APIClient:
         
         response = await self._make_request('POST', '/api/v1/motor3/replace-meal', data=replacement_data)
         return response
+    
+    async def download_plan_pdf(self, plan_id: str) -> bytes:
+        """Download PDF for a generated plan."""
+        logger.info(f"Downloading PDF for plan {plan_id}")
+        
+        url = urljoin(self.base_url, f'/api/v1/motor1/plan/{plan_id}/pdf')
+        
+        async with aiohttp.ClientSession(timeout=self.timeout) as session:
+            try:
+                async with session.get(url) as response:
+                    if response.status == 404:
+                        raise APIError("PDF not found", status_code=404)
+                    elif response.status >= 400:
+                        error_data = await response.json()
+                        raise APIError(
+                            f"API returned status {response.status}",
+                            status_code=response.status,
+                            response_data=error_data
+                        )
+                    
+                    # Read PDF content
+                    pdf_content = await response.read()
+                    return pdf_content
+                    
+            except asyncio.TimeoutError:
+                logger.error(f"Request to {url} timed out")
+                raise APIError("Request timed out", status_code=408)
+            except aiohttp.ClientError as e:
+                logger.error(f"Client error: {str(e)}")
+                raise APIError(f"Connection error: {str(e)}", status_code=503)
+            except APIError:
+                raise
+            except Exception as e:
+                logger.error(f"Unexpected error: {str(e)}")
+                raise APIError(f"Unexpected error: {str(e)}", status_code=500)
 
 
 class APIError(Exception):

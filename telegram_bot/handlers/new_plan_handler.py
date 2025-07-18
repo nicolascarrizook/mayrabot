@@ -554,6 +554,58 @@ async def handle_confirmation(update: Update, context: ContextTypes.DEFAULT_TYPE
             )
             await asyncio.sleep(0.5)  # Small delay between messages
         
+        # Check if PDF was generated and send it
+        if 'plan_id' in plan_data:
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=f"{settings.EMOJI_LOADING} Generando tu PDF personalizado..."
+            )
+            
+            # Wait a moment for PDF generation to complete
+            await asyncio.sleep(3)
+            
+            try:
+                # Download PDF from API
+                pdf_content = await api_client.download_plan_pdf(plan_data['plan_id'])
+                
+                # Send PDF to user
+                await context.bot.send_document(
+                    chat_id=update.effective_chat.id,
+                    document=pdf_content,
+                    filename=f"Plan_Nutricional_{context.user_data['plan_data']['name'].replace(' ', '_')}.pdf",
+                    caption=f"{settings.EMOJI_SUCCESS} ¡Aquí está tu plan nutricional personalizado!\n\n"
+                           "Plan de 3 días iguales - Método Tres Días y Carga\n\n"
+                           "Este documento contiene toda la información detallada de tu plan."
+                )
+            except APIError as e:
+                if e.status_code == 404:
+                    # PDF not ready yet, try again
+                    await asyncio.sleep(5)
+                    try:
+                        pdf_content = await api_client.download_plan_pdf(plan_data['plan_id'])
+                        await context.bot.send_document(
+                            chat_id=update.effective_chat.id,
+                            document=pdf_content,
+                            filename=f"Plan_Nutricional_{context.user_data['plan_data']['name'].replace(' ', '_')}.pdf",
+                            caption=f"{settings.EMOJI_SUCCESS} ¡Aquí está tu plan nutricional personalizado!"
+                        )
+                    except:
+                        logger.error(f"Failed to send PDF after retry: {str(e)}")
+                        await context.bot.send_message(
+                            chat_id=update.effective_chat.id,
+                            text=f"{settings.EMOJI_INFO} Tu plan se generó correctamente pero el PDF está tomando más tiempo. "
+                                 "Por favor, contacta al soporte si no lo recibes en unos minutos."
+                        )
+                else:
+                    logger.error(f"Error downloading PDF: {str(e)}")
+                    await context.bot.send_message(
+                        chat_id=update.effective_chat.id,
+                        text=f"{settings.EMOJI_INFO} Tu plan se generó correctamente pero hubo un problema al descargar el PDF. "
+                             "Por favor, contacta al soporte."
+                    )
+            except Exception as e:
+                logger.error(f"Unexpected error sending PDF: {str(e)}")
+        
         # Send completion message with back to menu option
         keyboard = keyboards.get_back_to_menu_keyboard()
         await context.bot.send_message(
