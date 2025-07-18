@@ -43,32 +43,26 @@ def format_meal_plan(plan_data: Dict[str, Any]) -> List[str]:
 {settings.EMOJI_SUCCESS} **Plan Nutricional Generado**
 
 📊 **Información General:**
-- Calorías diarias: {plan_data.get('daily_calories', 'N/A')} kcal
-- Proteínas: {plan_data.get('daily_protein', 'N/A')}g
-- Carbohidratos: {plan_data.get('daily_carbs', 'N/A')}g
-- Grasas: {plan_data.get('daily_fats', 'N/A')}g
+- Paciente: {plan_data.get('patient_name', 'N/A')}
+- Calorías diarias: {plan_data.get('total_calories', plan_data.get('daily_calories', 'N/A'))} kcal
+- IMC: {plan_data.get('bmi', 'N/A')} ({plan_data.get('bmi_category', 'N/A')})
+- Plan de {plan_data.get('total_days', 'N/A')} días
 """
     messages.append(header)
     
-    # Format each day's meals
-    for day_num, day_plan in plan_data.get('days', {}).items():
-        day_message = f"\n📅 **Día {day_num}**\n"
-        
-        for meal_type, meal_info in day_plan.items():
-            meal_emoji = get_meal_emoji(meal_type)
-            day_message += f"\n{meal_emoji} **{meal_type.title()}:**\n"
-            
-            # Add recipes
-            for recipe in meal_info.get('recipes', []):
-                day_message += f"• {recipe['name']} ({recipe.get('calories', 'N/A')} kcal)\n"
-            
-            # Check message length and split if necessary
-            if len(day_message) > 3000:
-                messages.append(day_message)
-                day_message = ""
-        
-        if day_message:
-            messages.append(day_message)
+    # Note: The response doesn't include detailed meal plans in the summary
+    # The PDF would contain the full details
+    summary_message = f"""
+📋 **Resumen del Plan:**
+- Comidas por día: {plan_data['plan_summary']['meals_per_day']}
+- Nivel económico: {plan_data['plan_summary']['economic_level']}
+- Patologías consideradas: {', '.join(plan_data['plan_summary']['pathologies']) if plan_data['plan_summary']['pathologies'] else 'Ninguna'}
+- Alergias consideradas: {', '.join(plan_data['plan_summary']['allergies']) if plan_data['plan_summary']['allergies'] else 'Ninguna'}
+
+📄 Tu plan nutricional completo está siendo generado en formato PDF.
+{plan_data.get('message', '')}
+"""
+    messages.append(summary_message)
     
     # Add recommendations if present
     if 'recommendations' in plan_data:

@@ -48,6 +48,9 @@ class OpenAIService:
             from prompts.base_prompt import BasePromptTemplate
             system_prompt = BasePromptTemplate.get_system_prompt()
             
+            logger.info(f"Calling OpenAI {self.model} with temperature={self.temperature}, max_tokens={self.max_tokens}")
+            logger.debug(f"Prompt length: {len(prompt)} chars")
+            
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
@@ -59,7 +62,11 @@ class OpenAIService:
                 response_format={"type": "json_object"}  # Force JSON response
             )
             
-            return response.choices[0].message.content
+            result = response.choices[0].message.content
+            logger.info(f"OpenAI response length: {len(result)} chars")
+            logger.debug(f"Response preview: {result[:200]}...")
+            
+            return result
             
         except Exception as e:
             logger.error(f"Error generating meal plan: {e}")

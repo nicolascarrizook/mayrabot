@@ -193,17 +193,31 @@ class PlanGeneratorService:
             )
             
             # Get plan from OpenAI
+            logger.info(f"Calling OpenAI with prompt length: {len(prompt)} chars")
             plan_json = await self.openai.generate_meal_plan(
                 patient_info=patient_data.__dict__,
                 recipes=all_day_recipes,
                 requirements={"prompt": prompt}
             )
             
+            logger.info(f"Received OpenAI response length: {len(plan_json)} chars")
+            logger.debug(f"OpenAI response preview: {plan_json[:500]}...")
+            
             # Parse and return the day's meals
-            # For now, return placeholder
-            return self._generate_placeholder_meals(meal_types, meal_distribution, daily_calories)
+            import json
+            try:
+                plan_data = json.loads(plan_json)
+                logger.info(f"Successfully parsed JSON with keys: {list(plan_data.keys())}")
+                parsed_meals = self._parse_generated_meals(plan_data, meal_types)
+                logger.info(f"Parsed {len(parsed_meals)} meals")
+                return parsed_meals
+            except json.JSONDecodeError as e:
+                logger.error(f"JSON decode error: {e}")
+                logger.error(f"Failed to parse OpenAI response: {plan_json[:200]}...")
+                return self._generate_placeholder_meals(meal_types, meal_distribution, daily_calories)
         
-        return meals
+        # If no recipes found, return placeholder
+        return self._generate_placeholder_meals(meal_types, meal_distribution, daily_calories)
     
     def _get_meal_distribution(self, meals_per_day: int) -> Dict[str, float]:
         """Get calorie distribution across meals"""
@@ -261,6 +275,66 @@ class PlanGeneratorService:
                     totals[macro] += value
         
         return totals
+    
+    def _parse_generated_meals(self, plan_data: Dict[str, Any], meal_types: List[str]) -> Dict[str, Dict[str, Any]]:
+        """Parse meals from OpenAI response"""
+        meals = {}
+        
+        # Handle different possible response formats
+        if "meals" in plan_data:
+            meal_list = plan_data["meals"]
+        elif "day_meals" in plan_data:
+            meal_list = plan_data["day_meals"]
+        else:
+            # Try to find meals in the response
+            for key in plan_data:
+                if isinstance(plan_data[key], list) and len(plan_data[key]) > 0:
+                    meal_list = plan_data[key]
+                    break
+            else:
+                logger.error("No meals found in OpenAI response")
+                return {}
+        
+        # Parse each meal
+        for meal_data in meal_list:
+            meal_type = meal_data.get("meal_type", "").lower()
+            
+            # Map meal types if needed
+            if meal_type in ["breakfast", "desayuno"]:
+                meal_type = "desayuno"
+            elif meal_type in ["lunch", "almuerzo"]:
+                meal_type = "almuerzo"
+            elif meal_type in ["dinner", "cena"]:
+                meal_type = "cena"
+            elif meal_type in ["snack", "merienda"]:
+                meal_type = "merienda"
+            elif "colacion" in meal_type or "snack" in meal_type:
+                if "am" in meal_type or "morning" in meal_type:
+                    meal_type = "colacion_am"
+                else:
+                    meal_type = "colacion_pm"
+            
+            if meal_type in meal_types:
+                meals[meal_type] = {
+                    "name": meal_data.get("recipe_name", meal_data.get("name", "Sin nombre")),
+                    "description": meal_data.get("description", ""),
+                    "ingredients": meal_data.get("ingredients", []),
+                    "preparation": meal_data.get("preparation", meal_data.get("instructions", "")),
+                    "calories": float(meal_data.get("calories", 0)),
+                    "portion": meal_data.get("portion", ""),
+                    "macros": {
+                        "carbohydrates": float(meal_data.get("carbs", meal_data.get("carbohydrates", 0))),
+                        "proteins": float(meal_data.get("protein", meal_data.get("proteins", 0))),
+                        "fats": float(meal_data.get("fat", meal_data.get("fats", 0)))
+                    }
+                }
+        
+        # Fill any missing meals with defaults
+        for meal_type in meal_types:
+            if meal_type not in meals:
+                logger.warning(f"Missing meal type {meal_type} in generated plan")
+        
+        return meals
     
     def _get_special_considerations(self, patient_data: PatientData) -> List[str]:
         """Get special considerations based on patient data"""
