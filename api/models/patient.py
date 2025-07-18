@@ -78,7 +78,7 @@ class PatientData(BaseModel):
     activity_type: ActivityType
     activity_frequency: int = Field(..., ge=1, le=7, description="Times per week")
     activity_duration: int = Field(..., description="Duration in minutes (30/45/60/75/90/120)")
-    activity_level: ActivityLevel  # Calculated from type, frequency and duration
+    activity_level: Optional[ActivityLevel] = None  # Calculated from type, frequency and duration
     
     # Lifestyle
     economic_level: EconomicLevel = EconomicLevel.MEDIO
@@ -109,18 +109,22 @@ class PatientData(BaseModel):
             raise ValueError(f'Duration must be one of: {valid_durations}')
         return v
     
-    @validator('activity_level', pre=False, always=True)
+    @validator('activity_level', pre=True, always=True)
     def calculate_activity_level(cls, v, values):
         """Calculate activity level from type, frequency and duration"""
-        if 'activity_type' not in values or 'activity_frequency' not in values or 'activity_duration' not in values:
+        # If a value is provided, use it
+        if v is not None:
+            return v
+            
+        # Otherwise calculate it
+        if 'activity_type' not in values or 'activity_frequency' not in values:
             return ActivityLevel.SEDENTARY
         
-        activity_type = values['activity_type']
-        frequency = values['activity_frequency']
-        duration = values['activity_duration']
+        activity_type = values.get('activity_type')
+        frequency = values.get('activity_frequency', 1)
         
         # Calculate based on type and frequency
-        if activity_type == ActivityType.SEDENTARIO:
+        if activity_type == 'sedentario' or activity_type == ActivityType.SEDENTARIO:
             return ActivityLevel.SEDENTARY
         elif frequency <= 2:
             return ActivityLevel.LIGHT
