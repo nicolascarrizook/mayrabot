@@ -12,27 +12,45 @@ class BasePromptTemplate:
     @staticmethod
     def format_patient_info(patient_data: Dict[str, Any]) -> str:
         """Format patient information for prompts"""
+        # Map objective to display text
+        objective_map = {
+            'mantenimiento': 'Mantenimiento',
+            'bajar_05': 'Bajar 0,5 kg/semana',
+            'bajar_1': 'Bajar 1 kg/semana',
+            'subir_05': 'Subir 0,5 kg/semana',
+            'subir_1': 'Subir 1 kg/semana'
+        }
+        
         return f"""
-INFORMACIÓN DEL PACIENTE:
-- Nombre: {patient_data.get('name', 'No especificado')}
-- Edad: {patient_data.get('age', 'No especificado')} años
-- Género: {patient_data.get('gender', 'No especificado')}
-- Altura: {patient_data.get('height', 'No especificado')} cm
-- Peso: {patient_data.get('weight', 'No especificado')} kg
-- IMC: {patient_data.get('bmi', 'No calculado')} ({patient_data.get('bmi_category', 'No categorizado')})
-- Nivel de actividad: {patient_data.get('activity_level', 'No especificado')}
-- Nivel económico: {patient_data.get('economic_level', 'standard')}
+DATOS DEL PACIENTE:
 
-CONDICIONES MÉDICAS:
-- Patologías: {', '.join(patient_data.get('pathologies', [])) or 'Ninguna'}
-- Alergias: {', '.join(patient_data.get('allergies', [])) or 'Ninguna'}
-- Preferencias alimentarias: {', '.join(patient_data.get('food_preferences', [])) or 'Ninguna'}
-- Alimentos que no le gustan: {', '.join(patient_data.get('food_dislikes', [])) or 'Ninguno'}
+Nombre: {patient_data.get('name', 'No especificado')}
+Edad: {patient_data.get('age', 'No especificado')} años
+Sexo: {'M' if patient_data.get('gender') == 'male' else 'F'}
+Estatura: {patient_data.get('height', 'No especificado')} cm
+Peso: {patient_data.get('weight', 'No especificado')} kg
+IMC: {patient_data.get('bmi', 'No calculado')} ({patient_data.get('bmi_category', 'No categorizado')})
 
-PLAN SOLICITADO:
-- Comidas por día: {patient_data.get('meals_per_day', 4)}
-- Días solicitados: {patient_data.get('days_requested', 7)}
-- Observaciones: {patient_data.get('observations', 'Ninguna')}
+Objetivo: {objective_map.get(patient_data.get('objective', ''), 'No especificado')}
+
+Tipo de actividad física: {patient_data.get('activity_type', 'No especificado')}
+Frecuencia semanal: {patient_data.get('activity_frequency', 'No especificado')}x
+Duración por sesión: {patient_data.get('activity_duration', 'No especificado')} minutos
+
+Suplementación: {', '.join(patient_data.get('supplementation', [])) or 'Ninguna'}
+Patologías / Medicación: {', '.join(patient_data.get('pathologies', [])) or 'Ninguna'} / {', '.join(patient_data.get('medications', [])) or 'Ninguna'}
+NO consume: {', '.join(patient_data.get('food_dislikes', [])) or 'Ninguno'}
+Le gusta: {', '.join(patient_data.get('food_preferences', [])) or 'Ninguno'}
+Horario habitual de comidas y entrenamiento: {patient_data.get('meal_schedule', 'No especificado')}
+
+Nivel económico: {patient_data.get('economic_level', 'medio')}
+Notas personales: {patient_data.get('personal_notes', 'Ninguna')}
+
+Tipo de peso a utilizar: Gramos en {patient_data.get('food_weight_type', 'crudo')}
+
+Especificaciones:
+- Comidas principales: {patient_data.get('meals_per_day', 4)}
+- Incluir colaciones: {'Sí - ' + patient_data.get('snack_type', '') if patient_data.get('include_snacks') else 'No'}
 """
 
     @staticmethod
@@ -102,34 +120,32 @@ DISTRIBUCIÓN DE COMIDAS (6 comidas/día):
     @staticmethod
     def get_system_prompt() -> str:
         """Get the system prompt for the nutritionist role"""
-        return """Eres una nutricionista profesional especializada en crear planes de alimentación personalizados. Tu enfoque se basa en:
+        return """Eres una nutricionista profesional especializada en el método Tres Días y Carga | Dieta Inteligente® & Nutrición Evolutiva.
 
-1. MÉTODO NUTRICIONAL: Utilizas un sistema de intercambios y equivalencias calóricas para garantizar flexibilidad y adherencia al plan.
+REGLAS DEL MÉTODO (que siempre se respetan):
 
-2. PRINCIPIOS FUNDAMENTALES:
-   - Equilibrio nutricional basado en las necesidades individuales
-   - Variedad en las opciones de alimentos
-   - Respeto por las preferencias y restricciones del paciente
-   - Adaptación al nivel económico
-   - Educación nutricional implícita en cada recomendación
+1. Plan de 3 días iguales en calorías y macronutrientes
+2. Todas las comidas en gramos (según se especifique: crudos o cocidos)
+3. Papa, batata y choclo (verduras tipo C): siempre en gramos
+4. Frutas: también en gramos
+5. Verduras no tipo C: libres, expresadas como volumen coherente (ej: "1 plato de ensalada", "2 tazas de verduras")
+6. Incluir preparación detallada de cada comida
+7. No usar suplementos si no están indicados
+8. Usar léxico argentino (ej: "palta" en lugar de "aguacate", "frutillas" en lugar de "fresas")
+9. Calorías calculadas según objetivos específicos del paciente
 
-3. FORMATO DE RESPUESTA:
-   - Utiliza un lenguaje claro y profesional pero cercano
-   - Proporciona instrucciones precisas de preparación
-   - Incluye tips nutricionales relevantes
-   - Especifica cantidades exactas en gramos o unidades
-   - Ofrece alternativas cuando sea apropiado
+FORMATO DE PLANES:
+- 3 días iguales (no variar entre días)
+- 3 opciones equivalentes por comida (±5% en calorías y macros)
+- Todas las cantidades en gramos según tipo especificado (crudo/cocido)
+- Incluir forma de preparación
+- Respetar el método al pie de la letra
 
-4. CONSIDERACIONES MÉDICAS:
-   - Siempre ten en cuenta las patologías reportadas
-   - Adapta las recomendaciones según las condiciones de salud
-   - Prioriza la seguridad alimentaria
-
-5. IMPORTANTE:
-   - SOLO usa las recetas proporcionadas en la base de datos
-   - NO inventes recetas nuevas
-   - Respeta las cantidades y preparaciones indicadas
-   - Mantén la coherencia con el método nutricional establecido"""
+IMPORTANTE:
+- SOLO usa las recetas proporcionadas en la base de datos
+- NO inventes recetas nuevas
+- Respeta el método Tres Días y Carga estrictamente
+- Mantén el léxico argentino en todo momento"""
 
     @staticmethod
     def format_json_response_schema(schema_type: str) -> str:
@@ -175,6 +191,64 @@ FORMATO DE RESPUESTA JSON REQUERIDO:
         "grains": ["item: cantidad total"],
         "dairy": ["item: cantidad total"],
         "others": ["item: cantidad total"]
+    }
+}
+""",
+            "meal_plan_tres_dias": """
+FORMATO DE RESPUESTA JSON REQUERIDO (TRES DÍAS Y CARGA):
+{
+    "metodo": "Tres Días y Carga | Dieta Inteligente® & Nutrición Evolutiva",
+    "patient_name": "Nombre del paciente",
+    "objective": "Objetivo del paciente",
+    "total_daily_calories": 2000,
+    "food_weight_type": "crudo" o "cocido",
+    "macros_distribution": {
+        "carbohydrates_percent": 45,
+        "proteins_percent": 25,
+        "fats_percent": 30
+    },
+    "meal_plan": {
+        "desayuno": {
+            "time": "08:00",
+            "opciones": [
+                {
+                    "nombre": "Opción 1 - Nombre descriptivo",
+                    "ingredientes": [
+                        {"alimento": "Avena", "cantidad": "50g", "tipo": "crudo"},
+                        {"alimento": "Banana", "cantidad": "100g", "tipo": "crudo"},
+                        {"alimento": "Leche descremada", "cantidad": "200ml"}
+                    ],
+                    "preparacion": "Preparación detallada en argentino...",
+                    "calorias": 350,
+                    "macros": {"carbos": 55, "proteinas": 15, "grasas": 8}
+                },
+                {"nombre": "Opción 2..."},
+                {"nombre": "Opción 3..."}
+            ]
+        },
+        "almuerzo": {...},
+        "merienda": {...},
+        "cena": {...}
+    },
+    "totales_diarios": {
+        "calorias": 2000,
+        "proteinas_g": 125,
+        "carbohidratos_g": 225,
+        "grasas_g": 67
+    },
+    "recomendaciones_generales": [
+        "Tomar 8-10 vasos de agua por día",
+        "Las verduras no tipo C son libres",
+        "Respetar los horarios de comida",
+        "Este plan se repite idéntico los 3 días"
+    ],
+    "lista_compras_3_dias": {
+        "proteinas": [{"item": "Pollo", "cantidad_total": "900g crudo"}],
+        "vegetales": [{"item": "Papa", "cantidad_total": "600g"}],
+        "frutas": [{"item": "Manzana", "cantidad_total": "900g"}],
+        "cereales": [{"item": "Arroz integral", "cantidad_total": "450g crudo"}],
+        "lacteos": [{"item": "Yogur descremado", "cantidad_total": "600g"}],
+        "otros": [{"item": "Aceite de oliva", "cantidad_total": "90ml"}]
     }
 }
 """,
@@ -225,37 +299,39 @@ FORMATO DE RESPUESTA JSON PARA REEMPLAZOS:
     def get_nutritional_method_context() -> str:
         """Get context about the nutritional method"""
         return """
-CONTEXTO DEL MÉTODO NUTRICIONAL:
+MÉTODO TRES DÍAS Y CARGA | DIETA INTELIGENTE® & NUTRICIÓN EVOLUTIVA
 
-Este método se basa en el sistema de intercambios y equivalencias, donde:
+Condiciones generales que SIEMPRE se cumplen:
 
-1. GRUPOS DE ALIMENTOS Y SUS EQUIVALENCIAS CALÓRICAS:
-   - Lácteos: 80 kcal por porción
-   - Frutas: 60 kcal por porción
-   - Cereales: 80 kcal por porción
-   - Proteínas: 75 kcal por porción
-   - Grasas: 45 kcal por porción
-   - Vegetales: 25 kcal por porción
+1. ESTRUCTURA DEL PLAN:
+   - Plan de 3 días IGUALES (mismo menú los 3 días)
+   - Todas las comidas deben estar en gramos
+   - Tipo de peso a usar: según especifique el paciente (crudo o cocido)
+   - 3 opciones equivalentes por cada comida (±5% en calorías y macros)
 
-2. FLEXIBILIDAD:
-   - Los alimentos dentro de cada grupo son intercambiables
-   - Se respetan las porciones equivalentes
-   - Se permite adaptación según disponibilidad y preferencias
+2. MEDICIÓN DE ALIMENTOS:
+   - Verduras tipo C (papa, batata y choclo): SIEMPRE en gramos
+   - Frutas: SIEMPRE en gramos
+   - Proteínas: SIEMPRE en gramos
+   - Cereales y legumbres: SIEMPRE en gramos
+   - Verduras NO tipo C: libres (porción visual coherente, ej: "1 plato", "2 tazas")
 
-3. PRINCIPIOS DE COMBINACIÓN:
-   - Cada comida debe incluir al menos 3 grupos de alimentos
-   - El desayuno y merienda deben incluir lácteos
-   - Almuerzo y cena deben incluir proteínas y vegetales
-   - Los cereales se distribuyen a lo largo del día
+3. CÁLCULO DE CALORÍAS SEGÚN OBJETIVO:
+   - Mantenimiento: TDEE (Total Daily Energy Expenditure)
+   - Bajar 0,5 kg/semana: TDEE - 500 kcal
+   - Bajar 1 kg/semana: TDEE - 1000 kcal
+   - Subir 0,5 kg/semana: TDEE + 500 kcal
+   - Subir 1 kg/semana: TDEE + 1000 kcal
 
-4. HIDRATACIÓN:
-   - Recomendar 8-10 vasos de agua al día
-   - Evitar bebidas azucaradas
-   - Infusiones permitidas sin azúcar
+4. LÉXICO Y PRESENTACIÓN:
+   - Usar SIEMPRE léxico argentino
+   - Incluir forma de preparación detallada
+   - No usar suplementos si no están indicados
+   - Especificar horarios sugeridos para cada comida
 
-5. CONDIMENTOS Y PREPARACIÓN:
-   - Preferir métodos de cocción saludables (vapor, horno, plancha)
-   - Usar condimentos naturales y hierbas
-   - Limitar el uso de sal
-   - Aceite con moderación según el plan
+5. ADAPTACIÓN SEGÚN NIVEL ECONÓMICO:
+   - Sin restricciones: variedad completa
+   - Medio: ingredientes de supermercado común
+   - Limitado: básicos (arroz, huevos, legumbres, vegetales de estación)
+   - Bajo recursos: plan social, opciones más económicas
 """

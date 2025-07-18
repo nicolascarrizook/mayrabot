@@ -11,23 +11,63 @@ from telegram_bot.config import settings
 
 def format_patient_summary(patient_data: Dict[str, Any]) -> str:
     """Format patient data summary for confirmation."""
+    # Map objectives
+    objective_map = {
+        'mantenimiento': 'Mantenimiento',
+        'bajar_05': 'Bajar 0,5 kg/semana',
+        'bajar_1': 'Bajar 1 kg/semana',
+        'subir_05': 'Subir 0,5 kg/semana',
+        'subir_1': 'Subir 1 kg/semana'
+    }
+    
+    # Format activity info
+    activity_info = patient_data.get('activity_type', '').replace('_', ' ').title()
+    if patient_data.get('activity_frequency', 0) > 0:
+        activity_info += f" - {patient_data['activity_frequency']}x por semana, {patient_data['activity_duration']} min"
+    
+    # Format snacks info
+    snacks_info = "No"
+    if patient_data.get('include_snacks'):
+        snack_types = {
+            'saciedad': 'Por saciedad',
+            'pre': 'Pre-entreno',
+            'post': 'Post-entreno'
+        }
+        snacks_info = snack_types.get(patient_data.get('snack_type', ''), 'Sí')
+    
+    # Format lists
+    def format_list(items):
+        if isinstance(items, list):
+            return ', '.join(items) if items else 'Ninguna'
+        return items if items and items != 'no' else 'Ninguna'
+    
     summary = f"""
-{settings.EMOJI_INFO} **Resumen de Información del Paciente**
+{settings.EMOJI_INFO} **Resumen - Método Tres Días y Carga**
 
 👤 **Nombre:** {patient_data['name']}
 🎂 **Edad:** {patient_data['age']} años
-⚧️ **Género:** {'Masculino' if patient_data['gender'] == 'M' else 'Femenino'}
-📏 **Altura:** {patient_data['height']} cm
+⚧️ **Sexo:** {'Masculino' if patient_data['gender'] == 'M' else 'Femenino'}
+📏 **Estatura:** {patient_data['height']} cm
 ⚖️ **Peso:** {patient_data['weight']} kg
-💪 **Actividad Física:** {patient_data['physical_activity'].replace('_', ' ').title()}
 
-🏥 **Patologías:** {patient_data.get('pathologies', 'Ninguna')}
-🚫 **Alergias:** {patient_data.get('allergies', 'Ninguna')}
-👍 **Preferencias:** {patient_data.get('preferences', 'Ninguna')}
-👎 **No le gusta:** {patient_data.get('dislikes', 'Ninguna')}
+🎯 **Objetivo:** {objective_map.get(patient_data.get('objective', ''), 'No especificado')}
+🏋️ **Actividad:** {activity_info}
+💊 **Suplementos:** {format_list(patient_data.get('supplementation', []))}
 
-🍽️ **Comidas al día:** {patient_data['meals_per_day']}
-📅 **Días solicitados:** {patient_data['days_requested']}
+🏥 **Patologías:** {format_list(patient_data.get('pathologies', []))}
+💊 **Medicaciones:** {format_list(patient_data.get('medications', []))}
+🚫 **Alergias:** {format_list(patient_data.get('allergies', []))}
+👍 **Le gusta:** {format_list(patient_data.get('preferences', []))}
+👎 **NO consume:** {format_list(patient_data.get('dislikes', []))}
+
+🕒 **Horarios:** {patient_data.get('meal_schedule', 'No especificado')}
+🍽️ **Comidas principales:** {patient_data['meals_per_day']}
+🍎 **Colaciones:** {snacks_info}
+💰 **Nivel económico:** {patient_data.get('economic_level', 'medio').replace('_', ' ').title()}
+🍳 **Pesos en:** {patient_data.get('food_weight_type', 'crudo').title()}
+📄 **Notas:** {patient_data.get('personal_notes', 'Ninguna')}
+
+📅 **Plan:** 3 días iguales (Tres Días y Carga)
 
 ¿Es correcta esta información?
 """

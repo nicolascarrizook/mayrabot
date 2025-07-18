@@ -58,28 +58,28 @@ class PlanGeneratorService:
         daily_calories = self._calculate_daily_calories(patient_data)
         macro_distribution = self._calculate_macro_distribution(patient_data)
         
-        # Generate meal plans for each day
+        # Generate meal plan for ONE day (Tres Días y Carga - same menu for 3 days)
+        # Only generate day 0 since all days are identical
+        day_meals = await self._generate_day_meals(
+            patient_data,
+            daily_calories,
+            macro_distribution,
+            0  # Always day 0 for Tres Días y Carga
+        )
+        
+        # Calculate day totals
+        day_calories = sum(meal['calories'] for meal in day_meals.values())
+        day_macros = self._calculate_day_macros(day_meals)
+        
+        # Create 3 identical days
         days = []
         start_date = date.today()
         
-        for day_num in range(patient_data.days_requested):
+        for day_num in range(3):  # Always 3 days for Tres Días y Carga
             current_date = start_date + timedelta(days=day_num)
-            
-            # Generate meals for the day
-            day_meals = await self._generate_day_meals(
-                patient_data,
-                daily_calories,
-                macro_distribution,
-                day_num
-            )
-            
-            # Calculate day totals
-            day_calories = sum(meal['calories'] for meal in day_meals.values())
-            day_macros = self._calculate_day_macros(day_meals)
-            
             days.append(DayPlan(
                 date=current_date,
-                meals=day_meals,
+                meals=day_meals,  # Same meals for all 3 days
                 total_calories=day_calories,
                 macros=day_macros
             ))
@@ -87,13 +87,13 @@ class PlanGeneratorService:
         return NutritionPlan(
             patient_name=patient_data.name,
             start_date=start_date,
-            end_date=start_date + timedelta(days=patient_data.days_requested - 1),
+            end_date=start_date + timedelta(days=2),  # Always 3 days
             days=days,
             total_daily_calories=daily_calories
         )
     
     def _calculate_daily_calories(self, patient_data: PatientData) -> float:
-        """Calculate daily caloric needs"""
+        """Calculate daily caloric needs based on objective"""
         # Mifflin-St Jeor equation for BMR
         if patient_data.gender == "male":
             bmr = 10 * patient_data.weight + 6.25 * patient_data.height - 5 * patient_data.age + 5
@@ -109,19 +109,26 @@ class PlanGeneratorService:
             "very_active": 1.9
         }
         
-        tdee = bmr * activity_factors.get(patient_data.activity_level, 1.2)
+        tdee = bmr * activity_factors.get(patient_data.activity_level.value if hasattr(patient_data.activity_level, 'value') else patient_data.activity_level, 1.2)
         
-        # Adjust for weight goals based on BMI
-        if patient_data.bmi > 25:  # Overweight
-            tdee *= 0.85  # 15% deficit
-        elif patient_data.bmi < 18.5:  # Underweight
-            tdee *= 1.15  # 15% surplus
-        
-        return round(tdee)
+        # Adjust based on objective (Tres Días y Carga method)
+        objective = patient_data.objective.value if hasattr(patient_data.objective, 'value') else patient_data.objective
+        if objective == "mantenimiento":
+            return round(tdee)
+        elif objective == "bajar_05":
+            return round(tdee - 500)  # Bajar 0.5 kg/semana
+        elif objective == "bajar_1":
+            return round(tdee - 1000)  # Bajar 1 kg/semana
+        elif objective == "subir_05":
+            return round(tdee + 500)  # Subir 0.5 kg/semana
+        elif objective == "subir_1":
+            return round(tdee + 1000)  # Subir 1 kg/semana
+        else:
+            return round(tdee)
     
     def _calculate_macro_distribution(self, patient_data: PatientData) -> Dict[str, float]:
         """Calculate macronutrient distribution"""
-        # Default balanced distribution
+        # Default distribution for Tres Días y Carga
         distribution = {
             "carbohydrates": 0.45,
             "proteins": 0.25,
@@ -129,10 +136,27 @@ class PlanGeneratorService:
         }
         
         # Adjust for specific conditions
-        if "diabetes" in [p.lower() for p in patient_data.pathologies]:
+        pathologies_lower = [p.lower() for p in patient_data.pathologies]
+        
+        if "diabetes" in pathologies_lower or "resistencia a la insulina" in pathologies_lower:
             distribution["carbohydrates"] = 0.40
             distribution["proteins"] = 0.30
             distribution["fats"] = 0.30
+        elif "hígado graso" in pathologies_lower:
+            distribution["carbohydrates"] = 0.40
+            distribution["proteins"] = 0.30
+            distribution["fats"] = 0.30
+        
+        # Adjust for objectives
+        objective = patient_data.objective.value if hasattr(patient_data.objective, 'value') else patient_data.objective
+        if "bajar" in objective:
+            # Increase protein for weight loss
+            distribution["proteins"] = 0.30
+            distribution["carbohydrates"] = 0.40
+        elif "subir" in objective:
+            # Increase carbs for weight gain
+            distribution["carbohydrates"] = 0.50
+            distribution["proteins"] = 0.20
         
         return distribution
     

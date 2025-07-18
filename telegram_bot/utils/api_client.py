@@ -76,39 +76,41 @@ class APIClient:
         logger.info("Generating new nutritional plan")
         
         # Prepare request data - convert to API format
-        # Convert gender from M/F to male/female
-        gender = "male" if patient_data['gender'] == 'M' else "female"
+        # Gender is already in correct format (male/female) from new handler
         
-        # Map activity levels from Spanish to English
-        activity_map = {
-            'sedentario': 'sedentary',
-            'ligera': 'light',
-            'moderada': 'moderate',
-            'intensa': 'active',
-            'muy_intensa': 'very_active'
-        }
-        activity_level = activity_map.get(patient_data['physical_activity'], 'moderate')
-        
-        # Convert pathologies, allergies, etc. from string to list
-        def string_to_list(value):
+        # Convert lists that might be strings
+        def ensure_list(value):
+            if isinstance(value, list):
+                return value
             if not value or value.lower() in ['ninguno', 'ninguna', 'no']:
                 return []
             return [item.strip() for item in value.split(',')]
         
+        # All fields for Tres Días y Carga method
         request_data = {
             "name": patient_data['name'],
             "age": patient_data['age'],
-            "gender": gender,
+            "gender": patient_data['gender'],  # Already 'male' or 'female'
             "height": patient_data['height'],
             "weight": patient_data['weight'],
-            "activity_level": activity_level,
-            "pathologies": string_to_list(patient_data.get('pathologies', '')),
-            "allergies": string_to_list(patient_data.get('allergies', '')),
-            "food_preferences": string_to_list(patient_data.get('preferences', '')),
-            "food_dislikes": string_to_list(patient_data.get('dislikes', '')),
+            "objective": patient_data['objective'],
+            "activity_type": patient_data['activity_type'],
+            "activity_frequency": patient_data.get('activity_frequency', 0),
+            "activity_duration": patient_data.get('activity_duration', 0),
+            "supplementation": ensure_list(patient_data.get('supplementation', [])),
+            "pathologies": ensure_list(patient_data.get('pathologies', [])),
+            "medications": ensure_list(patient_data.get('medications', [])),
+            "allergies": ensure_list(patient_data.get('allergies', [])),
+            "food_preferences": ensure_list(patient_data.get('preferences', [])),
+            "food_dislikes": ensure_list(patient_data.get('dislikes', [])),
+            "meal_schedule": patient_data.get('meal_schedule', ''),
             "meals_per_day": patient_data['meals_per_day'],
-            "days_requested": patient_data['days_requested'],
-            "economic_level": patient_data.get('economic_level', 'standard')
+            "include_snacks": patient_data.get('include_snacks', False),
+            "snack_type": patient_data.get('snack_type'),
+            "days_requested": patient_data.get('days_requested', 3),  # Always 3 for Tres Días
+            "economic_level": patient_data.get('economic_level', 'medio'),
+            "food_weight_type": patient_data.get('food_weight_type', 'crudo'),
+            "personal_notes": patient_data.get('personal_notes')
         }
         
         response = await self._make_request('POST', '/api/v1/motor1/generate-plan', data=request_data)
