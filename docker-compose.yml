@@ -1,0 +1,77 @@
+version: '3.9'
+
+services:
+  # FastAPI Backend Service
+  api:
+    build: .
+    container_name: nutrition_bot_api
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./api:/app/api
+      - ./data_processor:/app/data_processor
+      - ./prompts:/app/prompts
+      - ./pdf_templates:/app/pdf_templates
+      - ./chroma_db:/app/chroma_db
+      - ./generated_pdfs:/app/generated_pdfs
+      - ./data:/app/data
+    environment:
+      - PYTHONUNBUFFERED=1
+    env_file:
+      - .env
+    networks:
+      - nutrition_network
+    depends_on:
+      - redis
+
+  # Telegram Bot Service
+  telegram_bot:
+    build: .
+    container_name: nutrition_telegram_bot
+    command: python telegram_bot/bot.py
+    volumes:
+      - ./telegram_bot:/app/telegram_bot
+      - ./generated_pdfs:/app/generated_pdfs
+    env_file:
+      - .env
+    networks:
+      - nutrition_network
+    depends_on:
+      - api
+      - redis
+    restart: unless-stopped
+
+  # Redis Service (for caching)
+  redis:
+    image: redis:7-alpine
+    container_name: nutrition_bot_redis
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - nutrition_network
+    command: redis-server --appendonly yes
+
+  # ChromaDB Service (optional standalone)
+  # Uncomment if you want ChromaDB as a separate service
+  # chromadb:
+  #   image: ghcr.io/chroma-core/chroma:latest
+  #   container_name: nutrition_bot_chromadb
+  #   ports:
+  #     - "8001:8000"
+  #   volumes:
+  #     - ./chroma_db:/chroma/chroma
+  #   environment:
+  #     - IS_PERSISTENT=TRUE
+  #     - PERSIST_DIRECTORY=/chroma/chroma
+  #   networks:
+  #     - nutrition_network
+
+networks:
+  nutrition_network:
+    driver: bridge
+
+volumes:
+  redis_data:
