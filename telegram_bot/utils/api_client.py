@@ -86,6 +86,21 @@ class APIClient:
                 return []
             return [item.strip() for item in value.split(',')]
         
+        # Calculate activity level based on frequency
+        frequency = patient_data.get('activity_frequency', 1)
+        activity_type = patient_data.get('activity_type', 'sedentario')
+        
+        if activity_type == 'sedentario':
+            activity_level = 'sedentary'
+        elif frequency <= 2:
+            activity_level = 'light'
+        elif frequency <= 4:
+            activity_level = 'moderate'
+        elif frequency <= 5:
+            activity_level = 'active'
+        else:
+            activity_level = 'very_active'
+        
         # All fields for Tres Días y Carga method
         request_data = {
             "name": patient_data['name'],
@@ -97,6 +112,7 @@ class APIClient:
             "activity_type": patient_data['activity_type'],
             "activity_frequency": patient_data.get('activity_frequency', 1),
             "activity_duration": patient_data.get('activity_duration', 30),
+            "activity_level": activity_level,  # Add the calculated activity level
             "supplementation": ensure_list(patient_data.get('supplementation', [])),
             "pathologies": ensure_list(patient_data.get('pathologies', [])),
             "medications": ensure_list(patient_data.get('medications', [])),
