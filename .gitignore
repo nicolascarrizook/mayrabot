@@ -151,7 +151,7 @@ chroma_db/*
 !chroma_db/.gitkeep
 generated_pdfs/*
 !generated_pdfs/.gitkeep
-data/*.docx
+# data/*.docx  # Comentado para incluir archivos de recetas
 data/*.pdf
 *.db
 *.sqlite
