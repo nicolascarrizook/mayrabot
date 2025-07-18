@@ -57,8 +57,8 @@ def format_patient_summary(patient_data: Dict[str, Any]) -> str:
 🏥 **Patologías:** {format_list(patient_data.get('pathologies', []))}
 💊 **Medicaciones:** {format_list(patient_data.get('medications', []))}
 🚫 **Alergias:** {format_list(patient_data.get('allergies', []))}
-👍 **Le gusta:** {format_list(patient_data.get('preferences', []))}
-👎 **NO consume:** {format_list(patient_data.get('dislikes', []))}
+👍 **Le gusta:** {format_list(patient_data.get('food_preferences', patient_data.get('preferences', [])))}
+👎 **NO consume:** {format_list(patient_data.get('food_dislikes', patient_data.get('dislikes', [])))}
 
 🕒 **Horarios:** {patient_data.get('meal_schedule', 'No especificado')}
 🍽️ **Comidas principales:** {patient_data['meals_per_day']}

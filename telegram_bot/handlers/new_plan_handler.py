@@ -192,8 +192,8 @@ async def receive_activity_type(update: Update, context: ContextTypes.DEFAULT_TY
     
     if activity_type == 'sedentario':
         # Skip frequency and duration for sedentary
-        context.user_data['plan_data']['activity_frequency'] = 0
-        context.user_data['plan_data']['activity_duration'] = 0
+        context.user_data['plan_data']['activity_frequency'] = 1
+        context.user_data['plan_data']['activity_duration'] = 30
         
         await query.edit_message_text(
             "¿Estás tomando algún suplemento actualmente?\n\n"
@@ -358,7 +358,7 @@ async def receive_preferences(update: Update, context: ContextTypes.DEFAULT_TYPE
         return States.PREFERENCES
     
     # Store and continue
-    context.user_data['plan_data']['preferences'] = validators.format_list_input(preferences)
+    context.user_data['plan_data']['food_preferences'] = validators.format_list_input(preferences)
     
     await update.message.reply_text(
         "¿Hay algún alimento que NO consumís o preferís evitar?\n\n"
@@ -382,7 +382,7 @@ async def receive_dislikes(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         return States.DISLIKES
     
     # Store and continue
-    context.user_data['plan_data']['dislikes'] = validators.format_list_input(dislikes)
+    context.user_data['plan_data']['food_dislikes'] = validators.format_list_input(dislikes)
     
     await update.message.reply_text(
         "¿Cuáles son tus horarios habituales de comida y entrenamiento?\n\n"
