@@ -176,7 +176,110 @@ async def receive_objective(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     objective = query.data.split('_', 1)[1]  # obj_mantenimiento
     context.user_data['plan_data']['objective'] = objective
     
-    # Send activity type keyboard
+    # Ask about macro customization
+    keyboard = keyboards.get_macro_customization_keyboard()
+    await query.edit_message_text(
+        "¿Querés personalizar la distribución de macronutrientes?\n\n"
+        "La distribución estándar se ajusta automáticamente según tu objetivo y condiciones de salud.",
+        reply_markup=keyboard
+    )
+    
+    return States.MACRO_CUSTOMIZATION
+
+
+async def receive_macro_customization(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Receive macro customization preference."""
+    query = update.callback_query
+    await query.answer()
+    
+    choice = query.data.split('_')[1]  # macro_standard or macro_custom
+    
+    if choice == 'standard':
+        # Use standard distribution, skip to activity type
+        context.user_data['plan_data']['protein_level'] = None
+        context.user_data['plan_data']['carbs_adjustment'] = None
+        context.user_data['plan_data']['fat_percentage'] = None
+        
+        # Send activity type keyboard
+        keyboard = keyboards.get_activity_type_keyboard()
+        await query.edit_message_text(
+            "¿Qué tipo de actividad física realizás?",
+            reply_markup=keyboard
+        )
+        
+        return States.ACTIVITY_TYPE
+    else:
+        # Custom macros - start with protein level
+        keyboard = keyboards.get_protein_level_keyboard()
+        await query.edit_message_text(
+            "Seleccioná tu nivel de proteína según tu actividad y salud:\n\n"
+            "La proteína se calculará en gramos por kg de tu peso corporal.",
+            reply_markup=keyboard
+        )
+        
+        return States.PROTEIN_LEVEL
+
+
+async def receive_protein_level(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Receive protein level selection."""
+    query = update.callback_query
+    await query.answer()
+    
+    # Extract protein level from callback data
+    protein_level = query.data.split('_', 1)[1]  # protein_muy_baja
+    context.user_data['plan_data']['protein_level'] = protein_level
+    
+    # Ask about carbs adjustment
+    keyboard = keyboards.get_carbs_adjustment_keyboard()
+    await query.edit_message_text(
+        "¿Querés ajustar los carbohidratos?\n\n"
+        "El valor base se ajustará según el porcentaje que elijas.",
+        reply_markup=keyboard
+    )
+    
+    return States.CARBS_ADJUSTMENT
+
+
+async def receive_carbs_adjustment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Receive carbs adjustment selection."""
+    query = update.callback_query
+    
+    # Skip header buttons
+    if query.data == 'carbs_header':
+        await query.answer("Seleccioná un porcentaje")
+        return States.CARBS_ADJUSTMENT
+    
+    await query.answer()
+    
+    # Extract carbs adjustment from callback data
+    carbs_adjustment = int(query.data.split('_')[1])  # carbs_-20 -> -20
+    context.user_data['plan_data']['carbs_adjustment'] = carbs_adjustment
+    
+    # Ask about fat percentage
+    keyboard = keyboards.get_fat_percentage_keyboard()
+    await query.edit_message_text(
+        "¿Querés especificar el porcentaje de grasas?\n\n"
+        "O dejá que se calcule automáticamente para completar el 100% de macros.",
+        reply_markup=keyboard
+    )
+    
+    return States.FAT_PERCENTAGE
+
+
+async def receive_fat_percentage(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Receive fat percentage selection."""
+    query = update.callback_query
+    await query.answer()
+    
+    # Extract fat percentage from callback data
+    fat_data = query.data.split('_')[1]  # fat_auto or fat_30
+    
+    if fat_data == 'auto':
+        context.user_data['plan_data']['fat_percentage'] = None
+    else:
+        context.user_data['plan_data']['fat_percentage'] = int(fat_data)
+    
+    # Continue with activity type
     keyboard = keyboards.get_activity_type_keyboard()
     await query.edit_message_text(
         "¿Qué tipo de actividad física realizás?",
@@ -722,6 +825,10 @@ def get_new_plan_handler() -> ConversationHandler:
             States.HEIGHT: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_height)],
             States.WEIGHT: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_weight)],
             States.OBJECTIVE: [CallbackQueryHandler(receive_objective, pattern='^obj_')],
+            States.MACRO_CUSTOMIZATION: [CallbackQueryHandler(receive_macro_customization, pattern='^macro_')],
+            States.PROTEIN_LEVEL: [CallbackQueryHandler(receive_protein_level, pattern='^protein_')],
+            States.CARBS_ADJUSTMENT: [CallbackQueryHandler(receive_carbs_adjustment, pattern='^carbs_')],
+            States.FAT_PERCENTAGE: [CallbackQueryHandler(receive_fat_percentage, pattern='^fat_')],
             States.ACTIVITY_TYPE: [CallbackQueryHandler(receive_activity_type, pattern='^type_')],
             States.ACTIVITY_FREQUENCY: [CallbackQueryHandler(receive_activity_frequency, pattern='^freq_')],
             States.ACTIVITY_DURATION: [CallbackQueryHandler(receive_activity_duration, pattern='^dur_')],

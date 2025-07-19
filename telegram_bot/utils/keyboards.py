@@ -43,10 +43,16 @@ def get_gender_keyboard() -> InlineKeyboardMarkup:
 def get_objective_keyboard() -> InlineKeyboardMarkup:
     """Get weight objective keyboard."""
     keyboard = [
-        [InlineKeyboardButton("⚖️ Mantenimiento", callback_data='obj_mantenimiento')],
+        [InlineKeyboardButton("⚖️ Mantener peso", callback_data='obj_mantenimiento')],
+        # Bajar de peso
+        [InlineKeyboardButton("📉 Bajar 0,25 kg/semana", callback_data='obj_bajar_025')],
         [InlineKeyboardButton("📉 Bajar 0,5 kg/semana", callback_data='obj_bajar_05')],
+        [InlineKeyboardButton("📉 Bajar 0,75 kg/semana", callback_data='obj_bajar_075')],
         [InlineKeyboardButton("📉 Bajar 1 kg/semana", callback_data='obj_bajar_1')],
+        # Subir de peso
+        [InlineKeyboardButton("📈 Subir 0,25 kg/semana", callback_data='obj_subir_025')],
         [InlineKeyboardButton("📈 Subir 0,5 kg/semana", callback_data='obj_subir_05')],
+        [InlineKeyboardButton("📈 Subir 0,75 kg/semana", callback_data='obj_subir_075')],
         [InlineKeyboardButton("📈 Subir 1 kg/semana", callback_data='obj_subir_1')]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -236,4 +242,76 @@ def get_alternative_selection_keyboard(alternatives: List[dict]) -> InlineKeyboa
     keyboard.append([InlineKeyboardButton("🔍 Buscar otra vez", callback_data='search_again')])
     keyboard.append([InlineKeyboardButton("❌ Cancelar", callback_data='cancel')])
     
+    return InlineKeyboardMarkup(keyboard)
+
+
+def get_macro_customization_keyboard() -> InlineKeyboardMarkup:
+    """Get macro customization preference keyboard."""
+    keyboard = [
+        [InlineKeyboardButton("🎯 Usar distribución estándar", callback_data='macro_standard')],
+        [InlineKeyboardButton("⚙️ Personalizar macronutrientes", callback_data='macro_custom')]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+def get_protein_level_keyboard() -> InlineKeyboardMarkup:
+    """Get protein level selection keyboard."""
+    keyboard = [
+        [InlineKeyboardButton("🔻 Muy baja (0.5-0.8 g/kg) - Patologías renales", callback_data='protein_muy_baja')],
+        [InlineKeyboardButton("🔽 Conservada (0.8-1.2 g/kg) - Normal", callback_data='protein_conservada')],
+        [InlineKeyboardButton("➖ Moderada (1.2-1.6 g/kg) - Personas activas", callback_data='protein_moderada')],
+        [InlineKeyboardButton("➕ Alta (1.6-2.2 g/kg) - Uso deportivo", callback_data='protein_alta')],
+        [InlineKeyboardButton("🔺 Muy alta (2.2-2.8 g/kg) - Alto rendimiento", callback_data='protein_muy_alta')],
+        [InlineKeyboardButton("⚡ Extrema (3.0-3.5 g/kg) - Atletas especiales", callback_data='protein_extrema')]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+def get_carbs_adjustment_keyboard() -> InlineKeyboardMarkup:
+    """Get carbs adjustment keyboard."""
+    keyboard = []
+    
+    # Reducir carbohidratos
+    keyboard.append([InlineKeyboardButton("⬇️ Reducir carbohidratos", callback_data='carbs_header')])
+    row = []
+    for i in range(-50, 0, 10):
+        row.append(InlineKeyboardButton(f"{i}%", callback_data=f'carbs_{i}'))
+        if len(row) == 3:
+            keyboard.append(row)
+            row = []
+    if row:
+        keyboard.append(row)
+    
+    # Mantener normal
+    keyboard.append([InlineKeyboardButton("✅ Mantener normal (0%)", callback_data='carbs_0')])
+    
+    # Aumentar carbohidratos
+    keyboard.append([InlineKeyboardButton("⬆️ Aumentar carbohidratos", callback_data='carbs_header')])
+    row = []
+    for i in range(10, 55, 10):
+        row.append(InlineKeyboardButton(f"+{i}%", callback_data=f'carbs_{i}'))
+        if len(row) == 3:
+            keyboard.append(row)
+            row = []
+    if row:
+        keyboard.append(row)
+    
+    return InlineKeyboardMarkup(keyboard)
+
+
+def get_fat_percentage_keyboard() -> InlineKeyboardMarkup:
+    """Get fat percentage keyboard."""
+    keyboard = [
+        [InlineKeyboardButton("🤖 Calcular automáticamente", callback_data='fat_auto')],
+        [
+            InlineKeyboardButton("20%", callback_data='fat_20'),
+            InlineKeyboardButton("25%", callback_data='fat_25'),
+            InlineKeyboardButton("30%", callback_data='fat_30')
+        ],
+        [
+            InlineKeyboardButton("35%", callback_data='fat_35'),
+            InlineKeyboardButton("40%", callback_data='fat_40'),
+            InlineKeyboardButton("45%", callback_data='fat_45')
+        ]
+    ]
     return InlineKeyboardMarkup(keyboard)

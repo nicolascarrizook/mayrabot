@@ -41,10 +41,14 @@ class ActivityType(str, Enum):
 class Objective(str, Enum):
     """Weight objective"""
     MANTENIMIENTO = "mantenimiento"
-    BAJAR_05 = "bajar_05"  # Bajar 0.5 kg/semana
-    BAJAR_1 = "bajar_1"    # Bajar 1 kg/semana
-    SUBIR_05 = "subir_05"  # Subir 0.5 kg/semana
-    SUBIR_1 = "subir_1"    # Subir 1 kg/semana
+    BAJAR_025 = "bajar_025"  # Bajar 0.25 kg/semana
+    BAJAR_05 = "bajar_05"    # Bajar 0.5 kg/semana
+    BAJAR_075 = "bajar_075"  # Bajar 0.75 kg/semana
+    BAJAR_1 = "bajar_1"      # Bajar 1 kg/semana
+    SUBIR_025 = "subir_025"  # Subir 0.25 kg/semana
+    SUBIR_05 = "subir_05"    # Subir 0.5 kg/semana
+    SUBIR_075 = "subir_075"  # Subir 0.75 kg/semana
+    SUBIR_1 = "subir_1"      # Subir 1 kg/semana
 
 
 class FoodWeightType(str, Enum):
@@ -59,6 +63,16 @@ class EconomicLevel(str, Enum):
     MEDIO = "medio"
     LIMITADO = "limitado"
     BAJO_RECURSOS = "bajo_recursos"
+
+
+class ProteinLevel(str, Enum):
+    """Protein intake level based on activity and health conditions"""
+    MUY_BAJA = "muy_baja"        # 0.5-0.8 g/kg (patologías renales)
+    CONSERVADA = "conservada"     # 0.8-1.2 g/kg (normal)
+    MODERADA = "moderada"         # 1.2-1.6 g/kg (personas activas no deportistas)
+    ALTA = "alta"                 # 1.6-2.2 g/kg (uso deportivo)
+    MUY_ALTA = "muy_alta"        # 2.2-2.8 g/kg (deportistas alto rendimiento)
+    EXTREMA = "extrema"          # 3.0-3.5 g/kg (atletas con anabólicos)
 
 
 class PatientData(BaseModel):
@@ -102,11 +116,22 @@ class PatientData(BaseModel):
     # Optional notes
     personal_notes: Optional[str] = Field(None, description="Notas personales")
     
+    # Macro customization
+    carbs_adjustment: Optional[int] = Field(None, ge=-50, le=50, description="Ajuste de carbohidratos en % (-50 a +50)")
+    protein_level: Optional[ProteinLevel] = Field(None, description="Nivel de proteína según actividad y salud")
+    fat_percentage: Optional[int] = Field(None, ge=15, le=45, description="Porcentaje específico de grasas")
+    
     @validator('activity_duration')
     def validate_duration(cls, v):
         valid_durations = [30, 45, 60, 75, 90, 120]
         if v not in valid_durations:
             raise ValueError(f'Duration must be one of: {valid_durations}')
+        return v
+    
+    @validator('carbs_adjustment')
+    def validate_carbs_adjustment(cls, v):
+        if v is not None and v % 5 != 0:
+            raise ValueError('Carbs adjustment must be in intervals of 5 (-50, -45, -40, ..., 45, 50)')
         return v
     
     @validator('activity_level', pre=True, always=True)

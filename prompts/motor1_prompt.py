@@ -55,8 +55,10 @@ INSTRUCCIONES ESPECÍFICAS:
 
 2. BALANCE NUTRICIONAL:
    - Asegura que cada día cumpla con las calorías objetivo (±5%)
-   - Mantén la distribución de macronutrientes especificada
+   - Mantén la distribución de macronutrientes especificada EXACTAMENTE
+   - Si el paciente tiene nivel de proteína personalizado, respétalo estrictamente
    - Incluye todos los grupos de alimentos diariamente
+   - Verifica que los macros sumen 100% y respeten las especificaciones
 
 3. CONSIDERACIONES MÉDICAS:
 {cls._format_medical_considerations(patient_data)}

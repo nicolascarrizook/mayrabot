@@ -122,12 +122,20 @@ class PlanGeneratorService:
         objective = patient_data.objective.value if hasattr(patient_data.objective, 'value') else patient_data.objective
         if objective == "mantenimiento":
             return round(tdee)
+        elif objective == "bajar_025":
+            return round(tdee - 250)  # Bajar 0.25 kg/semana
         elif objective == "bajar_05":
             return round(tdee - 500)  # Bajar 0.5 kg/semana
+        elif objective == "bajar_075":
+            return round(tdee - 750)  # Bajar 0.75 kg/semana
         elif objective == "bajar_1":
             return round(tdee - 1000)  # Bajar 1 kg/semana
+        elif objective == "subir_025":
+            return round(tdee + 250)  # Subir 0.25 kg/semana
         elif objective == "subir_05":
             return round(tdee + 500)  # Subir 0.5 kg/semana
+        elif objective == "subir_075":
+            return round(tdee + 750)  # Subir 0.75 kg/semana
         elif objective == "subir_1":
             return round(tdee + 1000)  # Subir 1 kg/semana
         else:
@@ -135,6 +143,10 @@ class PlanGeneratorService:
     
     def _calculate_macro_distribution(self, patient_data: PatientData) -> Dict[str, float]:
         """Calculate macronutrient distribution"""
+        # Check if custom macros are provided
+        if patient_data.protein_level or patient_data.carbs_adjustment is not None or patient_data.fat_percentage:
+            return self._calculate_custom_macro_distribution(patient_data)
+        
         # Default distribution for Tres Días y Carga
         distribution = {
             "carbohydrates": 0.45,
@@ -166,6 +178,78 @@ class PlanGeneratorService:
             distribution["proteins"] = 0.20
         
         return distribution
+    
+    def _calculate_custom_macro_distribution(self, patient_data: PatientData) -> Dict[str, float]:
+        """Calculate custom macronutrient distribution based on user preferences"""
+        # Get daily calories for calculations
+        daily_calories = self._calculate_daily_calories(patient_data)
+        
+        # Calculate protein percentage based on level and body weight
+        protein_percentage = 0.25  # Default
+        
+        if patient_data.protein_level:
+            protein_g_per_kg = self._get_protein_grams_per_kg(patient_data.protein_level)
+            total_protein_g = patient_data.weight * protein_g_per_kg
+            protein_calories = total_protein_g * 4  # 4 kcal per gram of protein
+            protein_percentage = protein_calories / daily_calories
+            
+            # Cap protein percentage at reasonable levels
+            protein_percentage = min(protein_percentage, 0.40)  # Max 40% protein
+        
+        # Apply carbs adjustment if provided
+        base_carbs_percentage = 0.45
+        if patient_data.carbs_adjustment is not None:
+            # Convert adjustment to decimal (e.g., -20 becomes 0.8, +20 becomes 1.2)
+            adjustment_factor = 1 + (patient_data.carbs_adjustment / 100)
+            carbs_percentage = base_carbs_percentage * adjustment_factor
+            # Ensure carbs stay within reasonable bounds
+            carbs_percentage = max(0.20, min(0.65, carbs_percentage))
+        else:
+            carbs_percentage = base_carbs_percentage
+        
+        # Calculate or use specified fat percentage
+        if patient_data.fat_percentage:
+            fat_percentage = patient_data.fat_percentage / 100
+        else:
+            # Calculate remaining percentage for fats
+            fat_percentage = 1.0 - protein_percentage - carbs_percentage
+        
+        # Validate that macros sum to 100%
+        total = protein_percentage + carbs_percentage + fat_percentage
+        if abs(total - 1.0) > 0.02:  # Allow 2% tolerance
+            # Adjust fats to make it sum to 100%
+            fat_percentage = 1.0 - protein_percentage - carbs_percentage
+        
+        # Ensure all macros are within healthy ranges
+        distribution = {
+            "proteins": round(protein_percentage, 2),
+            "carbohydrates": round(carbs_percentage, 2),
+            "fats": round(max(0.15, min(0.45, fat_percentage)), 2)  # Keep fats between 15-45%
+        }
+        
+        # Final adjustment to ensure exactly 100%
+        total = sum(distribution.values())
+        if total != 1.0:
+            distribution["fats"] = round(1.0 - distribution["proteins"] - distribution["carbohydrates"], 2)
+        
+        logger.info(f"Custom macro distribution: Protein={distribution['proteins']*100}%, "
+                   f"Carbs={distribution['carbohydrates']*100}%, Fats={distribution['fats']*100}%")
+        
+        return distribution
+    
+    def _get_protein_grams_per_kg(self, protein_level: str) -> float:
+        """Get protein grams per kg based on level"""
+        protein_ranges = {
+            "muy_baja": 0.65,      # Middle of 0.5-0.8 range
+            "conservada": 1.0,     # Middle of 0.8-1.2 range
+            "moderada": 1.4,       # Middle of 1.2-1.6 range
+            "alta": 1.9,           # Middle of 1.6-2.2 range
+            "muy_alta": 2.5,       # Middle of 2.2-2.8 range
+            "extrema": 3.25        # Middle of 3.0-3.5 range
+        }
+        
+        level = protein_level.value if hasattr(protein_level, 'value') else protein_level
+        return protein_ranges.get(level, 1.0)
     
     async def _generate_day_meals(
         self,

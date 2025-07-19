@@ -88,12 +88,18 @@ class States:
     CONFIRM = 23
     GENERATING = 24
     
+    # Macro customization states
+    MACRO_CUSTOMIZATION = 25
+    PROTEIN_LEVEL = 26
+    CARBS_ADJUSTMENT = 27
+    FAT_PERCENTAGE = 28
+    
     # Meal replacement states
-    MEAL_TO_REPLACE = 20
-    MEAL_TYPE = 21
-    REASON = 22
-    AVOID_INGREDIENTS = 23
-    SEARCHING = 24
+    MEAL_TO_REPLACE = 40
+    MEAL_TYPE = 41
+    REASON = 42
+    AVOID_INGREDIENTS = 43
+    SEARCHING = 44
     
     # Common states
-    SELECTING_ACTION = 30
+    SELECTING_ACTION = 50

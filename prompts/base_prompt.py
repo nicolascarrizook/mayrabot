@@ -15,9 +15,13 @@ class BasePromptTemplate:
         # Map objective to display text
         objective_map = {
             'mantenimiento': 'Mantenimiento',
+            'bajar_025': 'Bajar 0,25 kg/semana',
             'bajar_05': 'Bajar 0,5 kg/semana',
+            'bajar_075': 'Bajar 0,75 kg/semana',
             'bajar_1': 'Bajar 1 kg/semana',
+            'subir_025': 'Subir 0,25 kg/semana',
             'subir_05': 'Subir 0,5 kg/semana',
+            'subir_075': 'Subir 0,75 kg/semana',
             'subir_1': 'Subir 1 kg/semana'
         }
         
@@ -51,7 +55,41 @@ Tipo de peso a utilizar: Gramos en {patient_data.get('food_weight_type', 'crudo'
 Especificaciones:
 - Comidas principales: {patient_data.get('meals_per_day', 4)}
 - Incluir colaciones: {'Sí - ' + patient_data.get('snack_type', '') if patient_data.get('include_snacks') else 'No'}
+
+{BasePromptTemplate._format_macro_customization(patient_data)}
 """
+
+    @staticmethod
+    def _format_macro_customization(patient_data: Dict[str, Any]) -> str:
+        """Format macro customization information if present"""
+        protein_level = patient_data.get('protein_level')
+        carbs_adjustment = patient_data.get('carbs_adjustment')
+        fat_percentage = patient_data.get('fat_percentage')
+        
+        if not protein_level and carbs_adjustment is None and not fat_percentage:
+            return ""
+        
+        text = "Personalización de Macronutrientes:\n"
+        
+        if protein_level:
+            protein_levels_text = {
+                'muy_baja': 'Muy baja (0.5-0.8 g/kg) - Patologías renales',
+                'conservada': 'Conservada (0.8-1.2 g/kg) - Normal',
+                'moderada': 'Moderada (1.2-1.6 g/kg) - Personas activas',
+                'alta': 'Alta (1.6-2.2 g/kg) - Uso deportivo',
+                'muy_alta': 'Muy alta (2.2-2.8 g/kg) - Alto rendimiento',
+                'extrema': 'Extrema (3.0-3.5 g/kg) - Atletas especiales'
+            }
+            text += f"- Nivel de proteína: {protein_levels_text.get(protein_level, protein_level)}\n"
+        
+        if carbs_adjustment is not None:
+            sign = "+" if carbs_adjustment > 0 else ""
+            text += f"- Ajuste de carbohidratos: {sign}{carbs_adjustment}%\n"
+        
+        if fat_percentage:
+            text += f"- Porcentaje de grasas: {fat_percentage}%\n"
+        
+        return text
 
     @staticmethod
     def format_recipes_list(recipes: List[Dict[str, Any]]) -> str:
