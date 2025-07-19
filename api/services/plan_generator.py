@@ -298,6 +298,18 @@ class PlanGeneratorService:
         
         # Generate the complete day plan using GPT-4
         if all_day_recipes:
+            # Get relevant equivalences for substitutions
+            equivalences = {}
+            try:
+                # Get common equivalence categories
+                for category in ['lacteos', 'frutas', 'cereales', 'proteinas', 'grasas', 'vegetales']:
+                    equiv = self.chromadb.get_equivalences(category)
+                    if equiv:
+                        equivalences[category] = equiv
+                logger.info(f"Loaded equivalences for {len(equivalences)} categories")
+            except Exception as e:
+                logger.warning(f"Could not load equivalences: {e}")
+            
             # Prepare the prompt
             prompt = Motor1PromptTemplate.generate_plan_prompt(
                 patient_data=patient_data.__dict__,
@@ -308,7 +320,8 @@ class PlanGeneratorService:
                     "protein_percentage": macro_distribution["proteins"] * 100,
                     "fat_percentage": macro_distribution["fats"] * 100,
                     "special_considerations": self._get_special_considerations(patient_data)
-                }
+                },
+                equivalences=equivalences
             )
             
             # Get plan from OpenAI
@@ -571,7 +584,7 @@ class PlanGeneratorService:
             meals: Dictionary of meals from OpenAI
             
         Returns:
-            Validated meals dictionary
+            Validated meals dictionary with complete recipe data from ChromaDB
             
         Raises:
             ValueError: If strict validation is enabled and invalid recipes are found
@@ -580,62 +593,202 @@ class PlanGeneratorService:
         invalid_recipes = []
         
         for meal_type, meal_data in meals.items():
-            recipe_name = meal_data.get('name', '').lower()
+            recipe_name = meal_data.get('name', '').strip()
+            recipe_name_lower = recipe_name.lower()
             
-            # Check if recipe exists in our valid recipes
-            if recipe_name in self._valid_recipe_names:
-                validated_meals[meal_type] = meal_data
-                if self.log_validation:
-                    logger.info(f"✓ Validated recipe for {meal_type}: {meal_data.get('name')}")
-            else:
-                # Recipe not found in database
-                invalid_recipes.append((meal_type, meal_data.get('name')))
-                
-                if self.strict_validation:
-                    logger.warning(f"⚠️ Recipe '{meal_data.get('name')}' for {meal_type} not found in database!")
-                    
-                    # In strict mode with reject option, raise error
-                    if self.reject_invalid:
-                        raise ValueError(
-                            f"Invalid recipe detected: '{meal_data.get('name')}' for {meal_type}. "
-                            f"This recipe does not exist in the database."
-                        )
-                    
-                    # Try to find a substitute
-                    substitute = self._find_substitute_recipe(meal_type, meal_data)
-                    if substitute:
-                        validated_meals[meal_type] = substitute
-                        if self.log_validation:
-                            logger.info(f"↻ Substituted with valid recipe: {substitute.get('name')}")
-                    else:
-                        logger.error(f"✗ No valid substitute found for {meal_type}")
+            # First, try exact match
+            if recipe_name_lower in self._valid_recipe_names:
+                # Get complete recipe data from ChromaDB
+                complete_recipe = self._get_complete_recipe_from_db(recipe_name)
+                if complete_recipe:
+                    validated_meals[meal_type] = complete_recipe
+                    if self.log_validation:
+                        logger.info(f"✓ Validated and loaded complete recipe for {meal_type}: {recipe_name}")
                 else:
-                    # In non-strict mode, accept the recipe but log warning
+                    # Fallback to OpenAI data if DB lookup fails
                     validated_meals[meal_type] = meal_data
-                    logger.warning(f"⚠️ Non-strict mode: Accepting unvalidated recipe '{meal_data.get('name')}' for {meal_type}")
+                    logger.warning(f"⚠️ Could not load complete recipe from DB for {recipe_name}, using OpenAI data")
+            else:
+                # Recipe not found - try fuzzy matching
+                fuzzy_match = self._find_fuzzy_match(recipe_name_lower)
+                if fuzzy_match:
+                    complete_recipe = self._get_complete_recipe_from_db(fuzzy_match)
+                    if complete_recipe:
+                        validated_meals[meal_type] = complete_recipe
+                        logger.info(f"↻ Fuzzy matched '{recipe_name}' to '{fuzzy_match}' and loaded from DB")
+                    else:
+                        invalid_recipes.append((meal_type, recipe_name))
+                else:
+                    invalid_recipes.append((meal_type, recipe_name))
+                    
+                    if self.strict_validation:
+                        logger.error(f"❌ Recipe '{recipe_name}' for {meal_type} not found in database!")
+                        
+                        # Try to find a substitute from ChromaDB
+                        substitute = self._find_substitute_recipe_from_db(meal_type, meal_data)
+                        if substitute:
+                            validated_meals[meal_type] = substitute
+                            logger.info(f"✅ Found substitute from DB: {substitute.get('name')}")
+                        else:
+                            if self.reject_invalid:
+                                raise ValueError(
+                                    f"Invalid recipe detected: '{recipe_name}' for {meal_type}. "
+                                    f"This recipe does not exist in the database and no substitute was found."
+                                )
+                            else:
+                                logger.error(f"❌ No valid substitute found for {meal_type}")
         
-        # Log summary if enabled
-        if self.log_validation and invalid_recipes:
-            logger.warning(f"Found {len(invalid_recipes)} invalid recipes: {invalid_recipes}")
+        # Log summary
+        if invalid_recipes:
+            logger.warning(f"\n⚠️  Found {len(invalid_recipes)} invalid recipes that required substitution:")
+            for meal_type, recipe_name in invalid_recipes:
+                logger.warning(f"   - {meal_type}: {recipe_name}")
         
         return validated_meals
     
-    def _find_substitute_recipe(self, meal_type: str, invalid_meal: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def _get_complete_recipe_from_db(self, recipe_name: str) -> Optional[Dict[str, Any]]:
         """
-        Find a substitute recipe from valid recipes when OpenAI suggests an invalid one
+        Get complete recipe data from ChromaDB
+        
+        Args:
+            recipe_name: Name of the recipe
+            
+        Returns:
+            Complete recipe data or None
+        """
+        try:
+            # Query ChromaDB for the specific recipe
+            results = self.chromadb.search_recipes(
+                query=recipe_name,
+                meal_type=None,
+                n_results=1
+            )
+            
+            if results and results['documents']:
+                # Parse the recipe document
+                recipe_doc = results['documents'][0]
+                metadata = results['metadatas'][0] if results.get('metadatas') else {}
+                
+                # Extract complete recipe information
+                return {
+                    'name': metadata.get('name', recipe_name),
+                    'description': metadata.get('description', ''),
+                    'ingredients': self._parse_ingredients_from_doc(recipe_doc),
+                    'preparation': self._parse_preparation_from_doc(recipe_doc),
+                    'calories': float(metadata.get('calories', 0)),
+                    'portion': metadata.get('portion', ''),
+                    'macros': {
+                        'carbohydrates': float(metadata.get('carbs_g', 0)),
+                        'proteins': float(metadata.get('protein_g', 0)),
+                        'fats': float(metadata.get('fat_g', 0))
+                    },
+                    'time': metadata.get('time', '30 minutos'),
+                    'difficulty': metadata.get('difficulty', 'Fácil')
+                }
+            return None
+        except Exception as e:
+            logger.error(f"Error getting recipe from DB: {e}")
+            return None
+    
+    def _find_fuzzy_match(self, recipe_name: str) -> Optional[str]:
+        """
+        Find a fuzzy match for a recipe name in our valid recipes
+        
+        Args:
+            recipe_name: The recipe name to match (lowercase)
+            
+        Returns:
+            The matched recipe name or None
+        """
+        # Simple fuzzy matching - check if any valid recipe contains the search term
+        for valid_name in self._valid_recipe_names:
+            if recipe_name in valid_name or valid_name in recipe_name:
+                return valid_name
+            
+            # Check if words match
+            search_words = set(recipe_name.split())
+            valid_words = set(valid_name.split())
+            if len(search_words.intersection(valid_words)) >= 2:
+                return valid_name
+        
+        return None
+    
+    def _find_substitute_recipe_from_db(self, meal_type: str, invalid_meal: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """
+        Find a substitute recipe from ChromaDB when OpenAI suggests an invalid one
         
         Args:
             meal_type: Type of meal (desayuno, almuerzo, etc.)
             invalid_meal: The invalid meal data from OpenAI
             
         Returns:
-            A valid substitute recipe or None
+            A valid substitute recipe with complete data or None
         """
         target_calories = invalid_meal.get('calories', 0)
         
-        # Find recipes for this meal type from our valid recipes
-        best_match = None
-        min_calorie_diff = float('inf')
+        # Search ChromaDB for similar recipes
+        try:
+            from api.services.recipe_searcher import RecipeSearcher
+            searcher = RecipeSearcher(self.chromadb)
+            
+            # Search for recipes of the same meal type with similar calories
+            results = searcher.search_by_meal_type(
+                meal_type=meal_type,
+                target_calories=target_calories,
+                tolerance=0.3,  # 30% calorie tolerance
+                n_results=5
+            )
+            
+            if results:
+                # Return the best match
+                best_recipe = results[0]
+                logger.info(f"Found substitute: {best_recipe.get('name')} ({best_recipe.get('calories')} kcal)")
+                return best_recipe
+                
+        except Exception as e:
+            logger.error(f"Error finding substitute recipe: {e}")
+        
+        return None
+    
+    def _parse_ingredients_from_doc(self, doc: str) -> List[str]:
+        """
+        Parse ingredients from recipe document
+        """
+        # Implementation depends on document format
+        # This is a placeholder - adjust based on actual format
+        ingredients = []
+        lines = doc.split('\n')
+        in_ingredients = False
+        
+        for line in lines:
+            if 'ingredientes:' in line.lower():
+                in_ingredients = True
+                continue
+            elif 'preparación:' in line.lower() or 'instrucciones:' in line.lower():
+                in_ingredients = False
+            elif in_ingredients and line.strip():
+                ingredients.append(line.strip())
+        
+        return ingredients
+    
+    def _parse_preparation_from_doc(self, doc: str) -> str:
+        """
+        Parse preparation instructions from recipe document
+        """
+        # Implementation depends on document format
+        # This is a placeholder - adjust based on actual format
+        lines = doc.split('\n')
+        preparation = []
+        in_preparation = False
+        
+        for line in lines:
+            if 'preparación:' in line.lower() or 'instrucciones:' in line.lower():
+                in_preparation = True
+                continue
+            elif in_preparation and line.strip():
+                preparation.append(line.strip())
+        
+        return ' '.join(preparation)
         
         for recipe_name, recipe_data in self._recipe_lookup.items():
             # Check if recipe is suitable for this meal type

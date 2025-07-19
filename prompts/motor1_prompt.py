@@ -2,7 +2,7 @@
 Motor 1: New Patient Plan Generation Prompt Template
 """
 
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from prompts.base_prompt import BasePromptTemplate
 
 
@@ -14,7 +14,8 @@ class Motor1PromptTemplate(BasePromptTemplate):
         cls,
         patient_data: Dict[str, Any],
         available_recipes: List[Dict[str, Any]],
-        nutritional_requirements: Dict[str, Any]
+        nutritional_requirements: Dict[str, Any],
+        equivalences: Optional[Dict[str, Any]] = None
     ) -> str:
         """
         Generate the complete prompt for creating a new nutrition plan
@@ -48,17 +49,28 @@ TAREA: Genera un plan nutricional completo y personalizado para el siguiente pac
 
 {cls.format_recipes_list(available_recipes)}
 
+{cls.format_equivalences(equivalences) if equivalences else ''}
+
 INSTRUCCIONES ESPECÍFICAS:
 
-1. SELECCIÓN DE RECETAS - CRÍTICO:
-   ⚠️ ADVERTENCIA: SOLO puedes usar las recetas EXACTAS de la lista proporcionada
-   - Usa ÚNICAMENTE las recetas proporcionadas en la lista - NO INVENTES NUEVAS
-   - Los nombres de las recetas deben coincidir EXACTAMENTE con los de la lista
-   - Si necesitas una receta y no está en la lista, elige la más similar disponible
+1. SELECCIÓN DE RECETAS - CRÍTICO E INNEGOCIABLE:
+   🚨 ADVERTENCIA CRÍTICA: SOLO puedes usar las recetas EXACTAS de la lista proporcionada
+   
+   REGLAS ABSOLUTAS:
+   ✅ USA SOLO los nombres EXACTOS de las recetas de la lista (copia y pega el nombre)
+   ❌ NUNCA inventes nombres de recetas
+   ❌ NUNCA modifiques los nombres de las recetas
+   ❌ NUNCA combines o mezcles nombres de recetas
+   ❌ NUNCA uses recetas que no estén en la lista
+   
+   INSTRUCCIONES:
+   - Copia el nombre EXACTO de la receta tal como aparece en la lista
+   - Si necesitas una receta específica y no está, busca la más similar EN LA LISTA
    - Varía las recetas durante los {patient_data.get('days_requested', 7)} días
    - No repitas la misma receta más de 2 veces por semana
    - Considera el nivel económico "{patient_data.get('economic_level', 'standard')}"
-   - NUNCA crees recetas que no estén en la lista proporcionada
+   
+   ⚠️ EL SISTEMA RECHAZARÁ AUTOMÁTICAMENTE cualquier receta que no esté en la lista
 
 2. BALANCE NUTRICIONAL:
    - Asegura que cada día cumpla con las calorías objetivo (±5%)

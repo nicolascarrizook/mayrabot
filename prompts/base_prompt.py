@@ -2,7 +2,7 @@
 Base Prompt Template and Utilities
 """
 
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 import json
 
 
@@ -92,30 +92,77 @@ Especificaciones:
 
     @staticmethod
     def format_recipes_list(recipes: List[Dict[str, Any]]) -> str:
-        """Format recipes list for prompts"""
+        """Format recipes list for prompts with strong emphasis on exact names"""
         if not recipes:
             return "No se encontraron recetas disponibles."
         
-        recipes_text = "RECETAS DISPONIBLES (SOLO PUEDES USAR ESTAS):\n"
-        recipes_text += "=" * 60 + "\n\n"
+        recipes_text = "🚨 LISTA DE RECETAS PERMITIDAS - USA SOLO ESTAS 🚨\n"
+        recipes_text += "=" * 80 + "\n"
+        recipes_text += "INSTRUCCIÓN CRÍTICA: Copia y pega EXACTAMENTE los nombres de estas recetas\n"
+        recipes_text += "=" * 80 + "\n\n"
         
-        for i, recipe in enumerate(recipes, 1):
-            recipe_name = recipe.get('metadata', {}).get('recipe_name', 'Sin nombre')
-            calories = recipe.get('metadata', {}).get('calories', 'No especificado')
-            category = recipe.get('metadata', {}).get('category', 'Sin categoría')
+        # Group recipes by meal type for easier selection
+        recipes_by_type = {}
+        for recipe in recipes:
             meal_types = recipe.get('metadata', {}).get('meal_types', '[]')
+            if isinstance(meal_types, str):
+                try:
+                    meal_types = eval(meal_types)
+                except:
+                    meal_types = []
             
-            recipes_text += f"{i}. NOMBRE EXACTO: {recipe_name}\n"
-            recipes_text += f"   Calorías: {calories} kcal\n"
-            recipes_text += f"   Categoría: {category}\n"
-            recipes_text += f"   Tipos de comida: {meal_types}\n"
-            recipes_text += f"   Contenido: {recipe.get('content', '')[:150]}...\n"
-            recipes_text += "-" * 40 + "\n"
+            for meal_type in meal_types:
+                if meal_type not in recipes_by_type:
+                    recipes_by_type[meal_type] = []
+                recipes_by_type[meal_type].append(recipe)
         
-        recipes_text += "\n⚠️ IMPORTANTE: Debes usar EXACTAMENTE estos nombres de recetas.\n"
-        recipes_text += "No modifiques los nombres ni crees recetas nuevas.\n"
+        # Format by meal type
+        for meal_type in ['desayuno', 'almuerzo', 'cena', 'merienda', 'colacion']:
+            if meal_type in recipes_by_type:
+                recipes_text += f"\n### RECETAS PARA {meal_type.upper()}:\n"
+                recipes_text += "-" * 60 + "\n"
+                
+                for recipe in recipes_by_type[meal_type]:
+                    recipe_name = recipe.get('metadata', {}).get('recipe_name', 'Sin nombre')
+                    calories = recipe.get('metadata', {}).get('calories', 'No especificado')
+                    
+                    recipes_text += f"✅ NOMBRE: \"{recipe_name}\"\n"
+                    recipes_text += f"   Calorías: {calories} kcal\n"
+                    recipes_text += f"   Copiar exactamente: {recipe_name}\n"
+                    recipes_text += "-" * 40 + "\n"
+        
+        recipes_text += "\n" + "=" * 80 + "\n"
+        recipes_text += "⚠️ RECORDATORIO FINAL:\n"
+        recipes_text += "1. USA SOLO los nombres exactos listados arriba\n"
+        recipes_text += "2. COPIA Y PEGA el nombre tal cual aparece\n"
+        recipes_text += "3. NO inventes ni modifiques nombres\n"
+        recipes_text += "4. El sistema RECHAZARÁ cualquier receta no listada\n"
+        recipes_text += "=" * 80 + "\n"
         
         return recipes_text
+
+    @staticmethod
+    def format_equivalences(equivalences: Optional[Dict[str, Any]]) -> str:
+        """Format equivalences for prompts"""
+        if not equivalences:
+            return ""
+        
+        equiv_text = "\n📊 TABLAS DE EQUIVALENCIAS DISPONIBLES:\n"
+        equiv_text += "=" * 60 + "\n"
+        equiv_text += "Puedes usar estas equivalencias para sustituir ingredientes:\n\n"
+        
+        for category, items in equivalences.items():
+            if isinstance(items, list) and items:
+                equiv_text += f"### {category.upper()}:\n"
+                for item in items[:5]:  # Show first 5 items
+                    if isinstance(item, dict):
+                        equiv_text += f"• {item}\n"
+                equiv_text += "\n"
+        
+        equiv_text += "Usa estas equivalencias para hacer sustituciones inteligentes cuando sea necesario.\n"
+        equiv_text += "=" * 60 + "\n"
+        
+        return equiv_text
 
     @staticmethod
     def format_nutritional_requirements(requirements: Dict[str, Any]) -> str:

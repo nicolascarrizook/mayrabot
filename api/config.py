@@ -52,7 +52,7 @@ class Settings(BaseSettings):
     
     # Recipe Validation Configuration
     strict_recipe_validation: bool = True  # Validate all recipes exist in DB
-    reject_invalid_recipes: bool = False   # Reject plan if contains invalid recipes
+    reject_invalid_recipes: bool = True    # Reject plan if contains invalid recipes (CHANGED to True)
     log_recipe_validation: bool = True     # Log validation details
     
     class Config:
