@@ -3,7 +3,7 @@ Progress bar utilities for professional UX
 """
 
 import asyncio
-from typing import Optional
+from typing import Optional, Any
 from telegram import Update
 from telegram.ext import ContextTypes
 from telegram_bot.config import settings
@@ -287,6 +287,3 @@ def _pathology_feedback(data: dict) -> str:
         return "\n".join(alerts) + "\n_Tu plan será adaptado a estas condiciones._"
     
     return None
-
-
-from typing import Any

@@ -2,6 +2,7 @@
 New Plan Generation Handler (Motor 1) - Tres Días y Carga Version
 """
 
+import asyncio
 import logging
 from typing import Dict, Any
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -746,7 +747,3 @@ def get_new_plan_handler() -> ConversationHandler:
         ],
         conversation_timeout=settings.CONVERSATION_TIMEOUT
     )
-
-
-# Import asyncio for sleep
-import asyncio
