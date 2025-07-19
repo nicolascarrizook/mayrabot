@@ -3,10 +3,13 @@ Message formatters for Telegram Bot
 """
 
 import re
+import logging
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 
 from telegram_bot.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 def format_patient_summary(patient_data: Dict[str, Any]) -> str:
@@ -86,12 +89,83 @@ def format_meal_plan(plan_data: Dict[str, Any]) -> List[str]:
 - Paciente: {plan_data.get('patient_name', 'N/A')}
 - Calorías diarias: {plan_data.get('total_calories', plan_data.get('daily_calories', 'N/A'))} kcal
 - IMC: {plan_data.get('bmi', 'N/A')} ({plan_data.get('bmi_category', 'N/A')})
-- Plan de {plan_data.get('total_days', 'N/A')} días
+- Plan de {plan_data.get('total_days', 'N/A')} días (Método Tres Días y Carga)
 """
     messages.append(header)
     
-    # Note: The response doesn't include detailed meal plans in the summary
-    # The PDF would contain the full details
+    # Check if meal data is included
+    if 'meals' in plan_data and plan_data['meals']:
+        meals_message = "\n🍽️ **Tu Plan de Comidas (se repite los 3 días):**\n"
+        
+        # Log for debugging
+        logger.info(f"Meals data received: {list(plan_data['meals'].keys())}")
+        
+        # Define meal order
+        meal_order = ['desayuno', 'colacion_am', 'almuerzo', 'merienda', 'cena', 'colacion_pm']
+        meal_names = {
+            'desayuno': 'Desayuno',
+            'colacion_am': 'Colación AM',
+            'almuerzo': 'Almuerzo',
+            'merienda': 'Merienda',
+            'cena': 'Cena',
+            'colacion_pm': 'Colación PM'
+        }
+        
+        for meal_type in meal_order:
+            if meal_type in plan_data['meals']:
+                meal = plan_data['meals'][meal_type]
+                meal_emoji = get_meal_emoji(meal_type)
+                
+                meals_message += f"\n{meal_emoji} **{meal_names.get(meal_type, meal_type.title())}**\n"
+                
+                if meal.get('name'):
+                    meals_message += f"📝 {meal['name']}\n"
+                
+                if meal.get('ingredients'):
+                    meals_message += "🥗 **Ingredientes:**\n"
+                    for ingredient in meal['ingredients']:
+                        if isinstance(ingredient, dict):
+                            meals_message += f"  • {ingredient.get('alimento', ingredient.get('name', ''))} - {ingredient.get('cantidad', ingredient.get('quantity', ''))}\n"
+                        else:
+                            meals_message += f"  • {ingredient}\n"
+                
+                if meal.get('preparation'):
+                    prep_text = meal['preparation']
+                    # Truncate if too long
+                    if len(prep_text) > 200:
+                        prep_text = prep_text[:197] + "..."
+                    meals_message += f"👨‍🍳 **Preparación:** {prep_text}\n"
+                
+                if meal.get('calories'):
+                    meals_message += f"🔥 **Calorías:** {meal['calories']} kcal\n"
+                
+                if meal.get('macros'):
+                    macros = meal['macros']
+                    meals_message += f"📊 **Macros:** Carb: {macros.get('carbohydrates', 0)}g | Prot: {macros.get('proteins', 0)}g | Grasas: {macros.get('fats', 0)}g\n"
+        
+        messages.append(meals_message)
+    else:
+        # No meal data received
+        logger.warning("No meal data received in plan_data")
+        no_meals_message = f"""
+🍽️ **Tu Plan de Comidas:**
+
+{settings.EMOJI_INFO} El detalle completo de las comidas está siendo procesado y estará disponible en el PDF.
+
+Por ahora, tu plan incluye:
+- {plan_data.get('plan_summary', {}).get('meals_per_day', 4)} comidas principales al día
+- Total de calorías diarias: {plan_data.get('total_calories', plan_data.get('daily_calories', 'N/A'))} kcal
+
+El PDF contendrá:
+✅ Todas las recetas detalladas
+✅ Ingredientes con cantidades exactas
+✅ Instrucciones de preparación
+✅ Información nutricional completa
+✅ 3 opciones equivalentes por comida
+"""
+        messages.append(no_meals_message)
+    
+    # Summary message
     summary_message = f"""
 📋 **Resumen del Plan:**
 - Comidas por día: {plan_data['plan_summary']['meals_per_day']}
@@ -99,7 +173,7 @@ def format_meal_plan(plan_data: Dict[str, Any]) -> List[str]:
 - Patologías consideradas: {', '.join(plan_data['plan_summary']['pathologies']) if plan_data['plan_summary']['pathologies'] else 'Ninguna'}
 - Alergias consideradas: {', '.join(plan_data['plan_summary']['allergies']) if plan_data['plan_summary']['allergies'] else 'Ninguna'}
 
-📄 Tu plan nutricional completo está siendo generado en formato PDF.
+📄 Tu plan nutricional completo con todas las opciones está siendo generado en formato PDF.
 {plan_data.get('message', '')}
 """
     messages.append(summary_message)

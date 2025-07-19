@@ -57,13 +57,70 @@ async def generate_new_plan(
             nutrition_plan
         )
         
-        # Return plan summary
+        # Prepare meal data for response
+        # Since it's "Tres Días y Carga", all days have the same meals
+        day_meals = {}
+        
+        # Add debug logging
+        logger.info(f"Nutrition plan type: {type(nutrition_plan)}")
+        logger.info(f"Has days attribute: {hasattr(nutrition_plan, 'days')}")
+        logger.info(f"Number of days: {len(nutrition_plan.days) if hasattr(nutrition_plan, 'days') else 0}")
+        
+        if hasattr(nutrition_plan, 'days') and nutrition_plan.days:
+            # Get meals from the first day (all days are identical)
+            first_day = nutrition_plan.days[0]
+            logger.info(f"First day type: {type(first_day)}")
+            logger.info(f"First day has meals: {hasattr(first_day, 'meals')}")
+            
+            # Handle meals as attribute (dataclass) not as dictionary
+            if hasattr(first_day, 'meals') and first_day.meals:
+                logger.info(f"Meals type: {type(first_day.meals)}")
+                logger.info(f"Meals keys: {list(first_day.meals.keys()) if isinstance(first_day.meals, dict) else 'Not a dict'}")
+                
+                # If meals is a dict, iterate through it
+                if isinstance(first_day.meals, dict):
+                    for meal_type, meal_data in first_day.meals.items():
+                        logger.info(f"Processing meal {meal_type}: {type(meal_data)}")
+                        
+                        # Handle meal_data whether it's a dict or has attributes
+                        if isinstance(meal_data, dict):
+                            day_meals[meal_type] = {
+                                "name": meal_data.get("name", ""),
+                                "description": meal_data.get("description", ""),
+                                "ingredients": meal_data.get("ingredients", []),
+                                "preparation": meal_data.get("preparation", ""),
+                                "calories": meal_data.get("calories", 0),
+                                "portion": meal_data.get("portion", ""),
+                                "macros": meal_data.get("macros", {})
+                            }
+                        else:
+                            # If meal_data is an object with attributes
+                            day_meals[meal_type] = {
+                                "name": getattr(meal_data, "name", ""),
+                                "description": getattr(meal_data, "description", ""),
+                                "ingredients": getattr(meal_data, "ingredients", []),
+                                "preparation": getattr(meal_data, "preparation", ""),
+                                "calories": getattr(meal_data, "calories", 0),
+                                "portion": getattr(meal_data, "portion", ""),
+                                "macros": getattr(meal_data, "macros", {})
+                            }
+                else:
+                    logger.warning(f"Meals is not a dictionary: {type(first_day.meals)}")
+            else:
+                logger.warning("First day has no meals attribute or meals is empty")
+        else:
+            logger.warning("Nutrition plan has no days")
+        
+        logger.info(f"Final day_meals: {list(day_meals.keys())}")
+        
+        # Return plan summary with meal data
         return {
             "status": "success",
             "plan_id": plan_id,
             "patient_name": patient_data.name,
-            "total_days": len(nutrition_plan.days),
-            "total_calories": nutrition_plan.total_daily_calories,
+            "total_days": len(nutrition_plan.days) if hasattr(nutrition_plan, 'days') else 3,
+            "total_calories": nutrition_plan.total_daily_calories if hasattr(nutrition_plan, 'total_daily_calories') else 2000,
+            "daily_calories": nutrition_plan.total_daily_calories if hasattr(nutrition_plan, 'total_daily_calories') else 2000,  # Add for compatibility
             "bmi": patient_data.bmi,
             "bmi_category": patient_data.bmi_category,
             "pdf_status": "generating",
@@ -74,6 +131,7 @@ async def generate_new_plan(
                 "pathologies": patient_data.pathologies,
                 "allergies": patient_data.allergies
             },
+            "meals": day_meals,  # Include the actual meal data
             "message": "Plan generated successfully. PDF will be available shortly."
         }
         

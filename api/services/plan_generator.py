@@ -3,6 +3,7 @@ Plan Generator Service - Generates nutrition plans using AI
 """
 
 from typing import Dict, Any, List
+import json
 import logging
 from dataclasses import dataclass
 from datetime import date, timedelta
@@ -233,7 +234,13 @@ class PlanGeneratorService:
                 plan_data = json.loads(plan_json)
                 logger.info(f"Successfully parsed JSON with keys: {list(plan_data.keys())}")
                 parsed_meals = self._parse_generated_meals(plan_data, meal_types)
-                logger.info(f"Parsed {len(parsed_meals)} meals")
+                logger.info(f"Parsed {len(parsed_meals)} meals: {list(parsed_meals.keys())}")
+                
+                # Log sample meal for debugging
+                if parsed_meals:
+                    first_meal_key = list(parsed_meals.keys())[0]
+                    logger.debug(f"Sample meal ({first_meal_key}): {parsed_meals[first_meal_key]}")
+                
                 return parsed_meals
             except json.JSONDecodeError as e:
                 logger.error(f"JSON decode error: {e}")
@@ -304,22 +311,68 @@ class PlanGeneratorService:
         """Parse meals from OpenAI response"""
         meals = {}
         
-        # Handle different possible response formats
-        if "meals" in plan_data:
+        # Handle "Tres Días y Carga" format first
+        if "meal_plan" in plan_data:
+            # This is the Tres Días y Carga format
+            meal_plan = plan_data["meal_plan"]
+            for meal_type in meal_types:
+                if meal_type in meal_plan:
+                    meal_info = meal_plan[meal_type]
+                    # Get the first option (all options are equivalent)
+                    if "opciones" in meal_info and meal_info["opciones"]:
+                        first_option = meal_info["opciones"][0]
+                        meals[meal_type] = {
+                            "name": first_option.get("nombre", "Sin nombre"),
+                            "description": "",
+                            "ingredients": first_option.get("ingredientes", []),
+                            "preparation": first_option.get("preparacion", ""),
+                            "calories": float(first_option.get("calorias", 0)),
+                            "portion": "",
+                            "macros": first_option.get("macros", {
+                                "carbohydrates": 0,
+                                "proteins": 0,
+                                "fats": 0
+                            })
+                        }
+                    elif "time" in meal_info:
+                        # Simple format with direct meal info
+                        meals[meal_type] = meal_info
+        
+        # Handle list formats
+        elif "meals" in plan_data:
             meal_list = plan_data["meals"]
+            meals = self._parse_meal_list(meal_list, meal_types)
         elif "day_meals" in plan_data:
             meal_list = plan_data["day_meals"]
+            meals = self._parse_meal_list(meal_list, meal_types)
+        elif "days" in plan_data and plan_data["days"]:
+            # Handle days format
+            first_day = plan_data["days"][0]
+            if "meals" in first_day:
+                meals = first_day["meals"]
         else:
             # Try to find meals in the response
             for key in plan_data:
                 if isinstance(plan_data[key], list) and len(plan_data[key]) > 0:
                     meal_list = plan_data[key]
+                    meals = self._parse_meal_list(meal_list, meal_types)
                     break
             else:
                 logger.error("No meals found in OpenAI response")
+                logger.error(f"Response keys: {list(plan_data.keys())}")
                 return {}
         
-        # Parse each meal
+        # Fill any missing meals with defaults
+        for meal_type in meal_types:
+            if meal_type not in meals:
+                logger.warning(f"Missing meal type {meal_type} in generated plan")
+        
+        return meals
+    
+    def _parse_meal_list(self, meal_list: List[Dict[str, Any]], meal_types: List[str]) -> Dict[str, Dict[str, Any]]:
+        """Parse a list of meals into a dictionary"""
+        meals = {}
+        
         for meal_data in meal_list:
             meal_type = meal_data.get("meal_type", "").lower()
             
@@ -353,10 +406,94 @@ class PlanGeneratorService:
                     }
                 }
         
-        # Fill any missing meals with defaults
-        for meal_type in meal_types:
-            if meal_type not in meals:
-                logger.warning(f"Missing meal type {meal_type} in generated plan")
+        return meals
+    
+    def _parse_generated_meals(self, plan_data: Dict[str, Any], meal_types: List[str]) -> Dict[str, Dict[str, Any]]:
+        """Parse generated meal plan from OpenAI response"""
+        meals = {}
+        
+        logger.info(f"Parsing meals with keys: {list(plan_data.keys())}")
+        
+        # Handle different response formats
+        # Format 1: meal_plan with opciones (Tres Días y Carga format)
+        if "meal_plan" in plan_data:
+            meal_plan = plan_data["meal_plan"]
+            logger.info(f"Found meal_plan with keys: {list(meal_plan.keys())}")
+            
+            for meal_type in meal_types:
+                if meal_type in meal_plan:
+                    meal_info = meal_plan[meal_type]
+                    
+                    # Get the first option (all options are equivalent)
+                    if "opciones" in meal_info and meal_info["opciones"]:
+                        first_option = meal_info["opciones"][0]
+                        
+                        # Format ingredients properly
+                        ingredients = []
+                        for ing in first_option.get("ingredientes", []):
+                            if isinstance(ing, dict):
+                                ingredients.append({
+                                    "alimento": ing.get("alimento", ""),
+                                    "cantidad": ing.get("cantidad", ""),
+                                    "tipo": ing.get("tipo", "crudo")
+                                })
+                            else:
+                                ingredients.append(str(ing))
+                        
+                        # Map macros to correct names
+                        macros = first_option.get("macros", {})
+                        if "carbos" in macros:
+                            macros["carbohydrates"] = macros.pop("carbos", 0)
+                        if "proteinas" in macros:
+                            macros["proteins"] = macros.pop("proteinas", 0)
+                        if "grasas" in macros:
+                            macros["fats"] = macros.pop("grasas", 0)
+                        
+                        meals[meal_type] = {
+                            "name": first_option.get("nombre", "Sin nombre"),
+                            "description": "",
+                            "ingredients": ingredients,
+                            "preparation": first_option.get("preparacion", ""),
+                            "calories": float(first_option.get("calorias", 0)),
+                            "portion": "",
+                            "macros": macros
+                        }
+                        logger.info(f"Parsed {meal_type} with {len(ingredients)} ingredients")
+                    else:
+                        logger.warning(f"No opciones found for {meal_type}")
+        
+        # Format 2: Direct meals structure
+        elif "meals" in plan_data:
+            for meal in plan_data["meals"]:
+                meal_type = meal.get("meal_type", "").lower()
+                if meal_type in meal_types:
+                    meals[meal_type] = {
+                        "name": meal.get("name", meal.get("recipe_name", "")),
+                        "description": meal.get("description", ""),
+                        "ingredients": meal.get("ingredients", []),
+                        "preparation": meal.get("preparation", meal.get("instructions", "")),
+                        "calories": float(meal.get("calories", 0)),
+                        "portion": meal.get("portion", ""),
+                        "macros": meal.get("macros", {})
+                    }
+        
+        # Format 3: Days structure
+        elif "days" in plan_data and plan_data["days"]:
+            first_day = plan_data["days"][0]
+            if "meals" in first_day:
+                if isinstance(first_day["meals"], dict):
+                    meals = first_day["meals"]
+                elif isinstance(first_day["meals"], list):
+                    for meal in first_day["meals"]:
+                        meal_type = meal.get("meal_type", "").lower()
+                        if meal_type in meal_types:
+                            meals[meal_type] = meal
+        
+        # If no meals found, log the structure
+        if not meals:
+            logger.error("No meals parsed from OpenAI response")
+            logger.error(f"Plan data structure: {json.dumps(plan_data, indent=2)[:1000]}")
+            return self._generate_placeholder_meals(meal_types, self._get_meal_distribution(len(meal_types)), 2000)
         
         return meals
     
