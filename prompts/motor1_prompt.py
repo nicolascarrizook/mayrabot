@@ -71,7 +71,7 @@ INSTRUCCIONES ESPECÍFICAS:
    - Agrupa por categorías (proteínas, vegetales, frutas, etc.)
    - Especifica cantidades totales necesarias
 
-{cls.format_json_response_schema('meal_plan')}
+{cls.format_json_response_schema('meal_plan_tres_dias')}
 
 RECUERDA:
 - Sé específico con las cantidades y preparaciones
