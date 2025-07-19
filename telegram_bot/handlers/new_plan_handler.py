@@ -152,6 +152,10 @@ async def receive_weight(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     weight_text = weight_text.replace(',', '.').strip()
     context.user_data['plan_data']['weight'] = float(weight_text)
     
+    # Show instant feedback with BMI calculation
+    from telegram_bot.utils.progress import show_instant_feedback
+    await show_instant_feedback(update, 'weight', context.user_data['plan_data'])
+    
     # Send objective keyboard
     keyboard = keyboards.get_objective_keyboard()
     await update.message.reply_text(
@@ -528,20 +532,43 @@ async def handle_confirmation(update: Update, context: ContextTypes.DEFAULT_TYPE
         context.user_data.clear()
         return ConversationHandler.END
     
-    # User confirmed, generate plan
-    await query.edit_message_text(
-        formatters.format_progress_message('generating_plan')
-    )
+    # User confirmed, generate plan with professional progress tracking
+    from telegram_bot.utils.progress import ProgressTracker
+    
+    # Delete the confirmation message to start fresh
+    await query.delete_message()
+    
+    # Initialize progress tracker
+    progress = ProgressTracker(update, context)
+    await progress.start("Generando tu Plan Nutricional Personalizado")
     
     try:
+        # Step 1: Process patient data
+        await progress.update_progress(1, "Analizando tu perfil nutricional...")
+        await asyncio.sleep(1)  # Give visual feedback time
+        
         # Convert gender back to API format
         if context.user_data['plan_data']['gender'] == 'M':
             context.user_data['plan_data']['gender'] = 'male'
         else:
             context.user_data['plan_data']['gender'] = 'female'
         
+        # Step 2: Recipe search phase
+        await progress.update_progress(2, "Buscando las mejores recetas para tu perfil...")
+        await asyncio.sleep(0.5)
+        
+        # Step 3: AI generation phase
+        await progress.update_progress(3, "Generando plan personalizado con inteligencia artificial...")
+        
         # Call API to generate plan
         plan_data = await api_client.generate_new_plan(context.user_data['plan_data'])
+        
+        # Step 4: Nutritional calculations
+        await progress.update_progress(4, "Calculando valores nutricionales y balanceando macros...")
+        await asyncio.sleep(0.5)
+        
+        # Step 5: PDF generation phase
+        await progress.update_progress(5, "Creando tu documento PDF profesional...")
         
         # Format and send plan
         messages = formatters.format_meal_plan(plan_data)
@@ -553,6 +580,13 @@ async def handle_confirmation(update: Update, context: ContextTypes.DEFAULT_TYPE
                 parse_mode='Markdown'
             )
             await asyncio.sleep(0.5)  # Small delay between messages
+        
+        # Step 6: Complete!
+        await progress.update_progress(6, "¡Plan completado! Preparando entrega...")
+        await asyncio.sleep(1)
+        
+        # Mark progress as complete
+        await progress.complete(success=True)
         
         # Check if PDF was generated and send it
         if 'plan_id' in plan_data:
@@ -619,21 +653,33 @@ async def handle_confirmation(update: Update, context: ContextTypes.DEFAULT_TYPE
         
     except APIError as e:
         logger.error(f"API error generating plan: {str(e)}")
+        
+        # Mark progress as failed
+        if 'progress' in locals():
+            await progress.complete(success=False)
+        
         error_msg = formatters.format_error_message('generation_error', str(e))
         
         keyboard = keyboards.get_back_to_menu_keyboard()
-        await query.edit_message_text(
-            error_msg,
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=error_msg,
             reply_markup=keyboard
         )
     
     except Exception as e:
         logger.error(f"Unexpected error generating plan: {str(e)}")
+        
+        # Mark progress as failed
+        if 'progress' in locals():
+            await progress.complete(success=False)
+        
         error_msg = formatters.format_error_message('unknown')
         
         keyboard = keyboards.get_back_to_menu_keyboard()
-        await query.edit_message_text(
-            error_msg,
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=error_msg,
             reply_markup=keyboard
         )
     

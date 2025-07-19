@@ -236,53 +236,168 @@ class PDFGeneratorService:
         story = []
         
         story.append(Paragraph("Plan de Alimentación - 3 Días Iguales", styles['SectionHeader']))
+        story.append(Paragraph("Método Tres Días y Carga | Dieta Inteligente® & Nutrición Evolutiva", styles['Normal']))
+        story.append(Spacer(1, 0.2*inch))
+        
+        # Define meal order and emojis
+        meal_order = ['desayuno', 'almuerzo', 'merienda', 'cena']
+        meal_names = {
+            'desayuno': '🌅 DESAYUNO',
+            'almuerzo': '☀️ ALMUERZO', 
+            'merienda': '🍵 MERIENDA',
+            'cena': '🌙 CENA'
+        }
         
         # Check if we have actual meal data
         if hasattr(nutrition_plan, 'days') and nutrition_plan.days:
-            for day in nutrition_plan.days[:3]:  # Show first 3 days (should be equal)
-                if hasattr(day, 'meals') and day.meals:
-                    for meal in day.meals:
+            # Get first day (all days are identical in Tres Días y Carga)
+            first_day = nutrition_plan.days[0]
+            
+            if hasattr(first_day, 'meals') and isinstance(first_day.meals, dict):
+                # Add note about 3 equal days
+                story.append(Paragraph(
+                    "<i>Este plan se repite idéntico durante los 3 días</i>",
+                    styles['Normal']
+                ))
+                story.append(Spacer(1, 0.2*inch))
+                
+                # Process each meal in order
+                for meal_type in meal_order:
+                    if meal_type in first_day.meals:
+                        meal = first_day.meals[meal_type]
+                        
+                        # Create meal section
                         meal_data = []
                         
-                        # Meal name and calories
-                        meal_name = getattr(meal, 'name', 'Comida')
-                        meal_calories = getattr(meal, 'calories', 0)
+                        # Meal header with emoji and calories
+                        meal_header = meal_names.get(meal_type, meal_type.upper())
+                        calories = meal.get('calories', 0)
+                        
                         meal_data.append([
-                            Paragraph(f"<b>{meal_name}</b>", styles['Normal']),
-                            Paragraph(f"<b>{meal_calories} kcal</b>", styles['Normal'])
+                            Paragraph(f"<b>{meal_header}</b>", styles['Heading3']),
+                            Paragraph(f"<b>{calories} kcal</b>", styles['Normal'])
                         ])
                         
-                        # Add meal items
-                        if hasattr(meal, 'items') and meal.items:
-                            for item in meal.items:
-                                item_name = getattr(item, 'name', '')
-                                item_quantity = getattr(item, 'quantity', '')
-                                if item_name:
-                                    meal_data.append([
-                                        Paragraph(f"• {item_name}", styles['Normal']),
-                                        Paragraph(item_quantity, styles['Normal'])
-                                    ])
+                        # Meal name/description
+                        if meal.get('name'):
+                            meal_data.append([
+                                Paragraph(f"<i>{meal['name']}</i>", styles['Normal']),
+                                ""
+                            ])
+                            meal_data.append(["", ""])  # Spacer row
                         
-                        # Create meal table
-                        if meal_data:
-                            meal_table = Table(meal_data, colWidths=[5*inch, 2*inch])
+                        # Ingredients section
+                        if meal.get('ingredients') and len(meal['ingredients']) > 0:
+                            meal_data.append([
+                                Paragraph("<b>Ingredientes:</b>", styles['Normal']),
+                                ""
+                            ])
+                            
+                            for ingredient in meal['ingredients']:
+                                if isinstance(ingredient, dict):
+                                    food = ingredient.get('alimento', ingredient.get('name', ''))
+                                    quantity = ingredient.get('cantidad', ingredient.get('quantity', ''))
+                                    ing_type = ingredient.get('tipo', '')
+                                    
+                                    # Format ingredient line
+                                    ing_text = f"• {food}"
+                                    if quantity:
+                                        ing_text += f" - {quantity}"
+                                    if ing_type and ing_type != 'crudo':
+                                        ing_text += f" ({ing_type})"
+                                else:
+                                    ing_text = f"• {ingredient}"
+                                
+                                meal_data.append([
+                                    Paragraph(ing_text, styles['Normal']),
+                                    ""
+                                ])
+                        
+                        # Preparation section
+                        if meal.get('preparation'):
+                            meal_data.append(["", ""])  # Spacer row
+                            meal_data.append([
+                                Paragraph("<b>Preparación:</b>", styles['Normal']),
+                                ""
+                            ])
+                            
+                            # Split long preparation text into paragraphs
+                            prep_text = meal['preparation']
+                            if len(prep_text) > 300:
+                                # Break into sentences
+                                sentences = prep_text.split('. ')
+                                current_para = ""
+                                for sentence in sentences:
+                                    if len(current_para) + len(sentence) < 300:
+                                        current_para += sentence + ". "
+                                    else:
+                                        if current_para:
+                                            meal_data.append([
+                                                Paragraph(current_para.strip(), styles['Normal']),
+                                                ""
+                                            ])
+                                        current_para = sentence + ". "
+                                if current_para:
+                                    meal_data.append([
+                                        Paragraph(current_para.strip(), styles['Normal']),
+                                        ""
+                                    ])
+                            else:
+                                meal_data.append([
+                                    Paragraph(prep_text, styles['Normal']),
+                                    ""
+                                ])
+                        
+                        # Macros section
+                        if meal.get('macros'):
+                            macros = meal['macros']
+                            carbs = macros.get('carbohydrates', macros.get('carbos', 0))
+                            proteins = macros.get('proteins', macros.get('proteinas', 0))
+                            fats = macros.get('fats', macros.get('grasas', 0))
+                            
+                            if carbs or proteins or fats:
+                                meal_data.append(["", ""])  # Spacer row
+                                macro_text = f"<b>Macros:</b> Carbohidratos: {carbs}g | Proteínas: {proteins}g | Grasas: {fats}g"
+                                meal_data.append([
+                                    Paragraph(macro_text, styles['Normal']),
+                                    ""
+                                ])
+                        
+                        # Create meal table with better styling
+                        if len(meal_data) > 1:  # Only create table if we have content
+                            meal_table = Table(meal_data, colWidths=[5.5*inch, 1.5*inch])
                             meal_table.setStyle(TableStyle([
-                                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#E5E7EB')),
+                                # Header row styling
+                                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#E0F2FE')),
+                                ('TEXTCOLOR', (0, 0), (-1, 0), colors.HexColor('#1E3A8A')),
+                                # General styling
                                 ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                                ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
+                                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
                                 ('FONTSIZE', (0, 0), (-1, -1), 10),
-                                ('TOPPADDING', (0, 0), (-1, -1), 5),
-                                ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-                                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+                                ('TOPPADDING', (0, 0), (-1, -1), 6),
+                                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                                ('LEFTPADDING', (0, 0), (-1, -1), 10),
+                                ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+                                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#E5E7EB')),
+                                # Alternating row colors
+                                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F9FAFB')])
                             ]))
+                            
                             story.append(meal_table)
-                            story.append(Spacer(1, 0.2*inch))
-                    
-                    # Only show first day since all 3 are equal
-                    break
+                            story.append(Spacer(1, 0.4*inch))
+            else:
+                # Log the actual structure for debugging
+                logger.warning(f"Unexpected meal structure. Type: {type(first_day.meals) if hasattr(first_day, 'meals') else 'No meals attribute'}")
+                story.append(Paragraph(
+                    "Error: No se pudieron cargar las comidas del plan. Por favor, contacte soporte.",
+                    styles['Normal']
+                ))
         else:
-            # Fallback if no meal data
+            # No days in nutrition plan
+            logger.error("No days found in nutrition plan")
             story.append(Paragraph(
-                "El plan detallado de comidas se está generando. Por favor, consulte con su nutricionista.",
+                "El plan nutricional está siendo procesado. Por favor, intente nuevamente en unos momentos.",
                 styles['Normal']
             ))
         

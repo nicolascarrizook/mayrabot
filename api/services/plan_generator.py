@@ -170,37 +170,32 @@ class PlanGeneratorService:
     ) -> Dict[str, Dict[str, Any]]:
         """Generate meals for a single day"""
         
-        # Get search queries for each meal type
-        search_queries = Motor1PromptTemplate.generate_recipe_search_queries(
-            patient_data.__dict__
-        )
+        # Use enhanced recipe searcher
+        from api.services.recipe_searcher import RecipeSearcher
+        recipe_searcher = RecipeSearcher(self.chromadb)
         
         # Distribute calories across meals
         meal_distribution = self._get_meal_distribution(patient_data.meals_per_day)
-        
-        meals = {}
         meal_types = self._get_meal_types(patient_data.meals_per_day)
         
-        # Collect all recipes for the day
-        all_day_recipes = []
+        # Find best recipes for each meal
+        logger.info("Starting intelligent recipe search...")
+        best_recipes = await recipe_searcher.find_best_recipes_for_plan(
+            patient_data=patient_data,
+            daily_calories=daily_calories,
+            meal_distribution=meal_distribution
+        )
         
-        for meal_type in meal_types:
-            meal_calories = daily_calories * meal_distribution[meal_type]
-            
-            # Search for recipes using appropriate queries
-            queries = search_queries.get(meal_type, [meal_type])
-            for query in queries[:3]:  # Use top 3 queries
-                recipes = self.chromadb.search_recipes(
-                    query=query,
-                    n_results=5,
-                    filters={
-                        "meal_types": meal_type,
-                        "economic_level": patient_data.economic_level.value if hasattr(patient_data.economic_level, 'value') else patient_data.economic_level
-                    }
-                )
-                if recipes:
-                    all_day_recipes.extend(recipes)
-                    break
+        # Log recipe search results
+        for meal_type, recipes in best_recipes.items():
+            logger.info(f"{meal_type}: Found {len(recipes)} suitable recipes")
+            if recipes:
+                logger.info(f"  Top recipe: {recipes[0].get('name', 'Unknown')} - {self._get_recipe_calories(recipes[0])} kcal")
+        
+        # Flatten all recipes for the prompt
+        all_day_recipes = []
+        for meal_type, recipes in best_recipes.items():
+            all_day_recipes.extend(recipes[:3])  # Take top 3 per meal
         
         # Generate the complete day plan using GPT-4
         if all_day_recipes:
@@ -496,6 +491,19 @@ class PlanGeneratorService:
             return self._generate_placeholder_meals(meal_types, self._get_meal_distribution(len(meal_types)), 2000)
         
         return meals
+    
+    def _get_recipe_calories(self, recipe: Dict[str, Any]) -> float:
+        """Extract calories from recipe data"""
+        # Try different possible fields
+        calories = recipe.get('calories', 0)
+        if not calories:
+            calories = recipe.get('calorias', 0)
+        if not calories:
+            metadata = recipe.get('metadata', {})
+            if isinstance(metadata, dict):
+                calories = metadata.get('calories', 0)
+        
+        return float(calories) if calories else 0
     
     def _get_special_considerations(self, patient_data: PatientData) -> List[str]:
         """Get special considerations based on patient data"""
