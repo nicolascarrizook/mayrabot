@@ -133,7 +133,7 @@ REQUERIMIENTOS NUTRICIONALES:
     @staticmethod
     def format_meal_distribution(meals_per_day: int, daily_calories: int = 2000, 
                                carbs_percent: float = 0.45, protein_percent: float = 0.25, 
-                               fat_percent: float = 0.30) -> str:
+                               fat_percent: float = 0.30, distribution_type: str = "traditional") -> str:
         """Format meal distribution throughout the day with macros breakdown"""
         
         # Calculate total daily macros
@@ -142,19 +142,32 @@ REQUERIMIENTOS NUTRICIONALES:
         total_fat_g = round((daily_calories * fat_percent) / 9)
         
         # Meal percentages
-        meal_percentages = {
-            3: {"desayuno": 0.30, "almuerzo": 0.40, "cena": 0.30},
-            4: {"desayuno": 0.25, "almuerzo": 0.35, "merienda": 0.15, "cena": 0.25},
-            5: {"desayuno": 0.20, "colacion_am": 0.10, "almuerzo": 0.35, 
-                "merienda": 0.15, "cena": 0.20},
-            6: {"desayuno": 0.20, "colacion_am": 0.10, "almuerzo": 0.30,
-                "merienda": 0.10, "cena": 0.20, "colacion_pm": 0.10}
-        }
+        if distribution_type == "equitable":
+            # Equal distribution for all meals
+            meal_types = {
+                3: ["desayuno", "almuerzo", "cena"],
+                4: ["desayuno", "almuerzo", "merienda", "cena"],
+                5: ["desayuno", "colacion_am", "almuerzo", "merienda", "cena"],
+                6: ["desayuno", "colacion_am", "almuerzo", "merienda", "cena", "colacion_pm"]
+            }
+            meals = meal_types.get(meals_per_day, meal_types[4])
+            equal_percentage = 1.0 / len(meals)
+            percentages = {meal: equal_percentage for meal in meals}
+        else:
+            # Traditional distribution
+            meal_percentages = {
+                3: {"desayuno": 0.30, "almuerzo": 0.40, "cena": 0.30},
+                4: {"desayuno": 0.25, "almuerzo": 0.35, "merienda": 0.15, "cena": 0.25},
+                5: {"desayuno": 0.20, "colacion_am": 0.10, "almuerzo": 0.35, 
+                    "merienda": 0.15, "cena": 0.20},
+                6: {"desayuno": 0.20, "colacion_am": 0.10, "almuerzo": 0.30,
+                    "merienda": 0.10, "cena": 0.20, "colacion_pm": 0.10}
+            }
+            percentages = meal_percentages.get(meals_per_day, meal_percentages[4])
         
-        percentages = meal_percentages.get(meals_per_day, meal_percentages[4])
-        
+        distribution_label = "EQUITATIVA" if distribution_type == "equitable" else "TRADICIONAL"
         result = f"""
-DISTRIBUCIÓN DE COMIDAS ({meals_per_day} comidas/día):
+DISTRIBUCIÓN DE COMIDAS ({meals_per_day} comidas/día - Distribución {distribution_label}):
 Calorías totales: {daily_calories} kcal
 Macros totales: {total_carbs_g}g carbs | {total_protein_g}g proteína | {total_fat_g}g grasa
 

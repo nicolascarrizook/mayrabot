@@ -149,6 +149,15 @@ def get_meals_per_day_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(keyboard)
 
 
+def get_distribution_type_keyboard() -> InlineKeyboardMarkup:
+    """Get distribution type selection keyboard."""
+    keyboard = [
+        [InlineKeyboardButton("📊 Distribución Tradicional", callback_data='dist_traditional')],
+        [InlineKeyboardButton("⚖️ Distribución Equitativa", callback_data='dist_equitable')]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
 def get_snacks_keyboard() -> InlineKeyboardMarkup:
     """Get snacks/colaciones keyboard."""
     keyboard = [

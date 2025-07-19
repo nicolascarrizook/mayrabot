@@ -75,6 +75,12 @@ class ProteinLevel(str, Enum):
     EXTREMA = "extrema"          # 3.0-3.5 g/kg (atletas con anabólicos)
 
 
+class DistributionType(str, Enum):
+    """Type of calorie and macronutrient distribution across meals"""
+    TRADITIONAL = "traditional"   # Different percentages per meal (30-40-30, 25-35-15-25, etc.)
+    EQUITABLE = "equitable"      # Equal distribution across all meals
+
+
 class PatientData(BaseModel):
     """Patient information for plan generation"""
     
@@ -120,6 +126,7 @@ class PatientData(BaseModel):
     carbs_percentage: Optional[int] = Field(None, ge=5, le=65, description="Porcentaje de carbohidratos del total calórico (5-65%)")
     protein_level: Optional[ProteinLevel] = Field(None, description="Nivel de proteína según actividad y salud")
     fat_percentage: Optional[int] = Field(None, ge=15, le=45, description="Porcentaje específico de grasas")
+    distribution_type: DistributionType = Field(default=DistributionType.TRADITIONAL, description="Tipo de distribución de calorías y macros entre comidas")
     
     @validator('activity_duration')
     def validate_duration(cls, v):

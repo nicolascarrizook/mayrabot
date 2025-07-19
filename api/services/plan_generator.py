@@ -261,7 +261,10 @@ class PlanGeneratorService:
         recipe_searcher = RecipeSearcher(self.chromadb)
         
         # Distribute calories across meals
-        meal_distribution = self._get_meal_distribution(patient_data.meals_per_day)
+        meal_distribution = self._get_meal_distribution(
+            patient_data.meals_per_day,
+            patient_data.distribution_type.value if hasattr(patient_data, 'distribution_type') else "traditional"
+        )
         meal_types = self._get_meal_types(patient_data.meals_per_day)
         
         # Find best recipes for each meal
@@ -357,8 +360,15 @@ class PlanGeneratorService:
         # If no recipes found, return placeholder
         return self._generate_placeholder_meals(meal_types, meal_distribution, daily_calories)
     
-    def _get_meal_distribution(self, meals_per_day: int) -> Dict[str, float]:
+    def _get_meal_distribution(self, meals_per_day: int, distribution_type: str = "traditional") -> Dict[str, float]:
         """Get calorie distribution across meals"""
+        if distribution_type == "equitable":
+            # Equal distribution for all meals
+            meal_types = self._get_meal_types(meals_per_day)
+            equal_percentage = 1.0 / len(meal_types)
+            return {meal: equal_percentage for meal in meal_types}
+        
+        # Traditional distribution
         distributions = {
             3: {"desayuno": 0.30, "almuerzo": 0.40, "cena": 0.30},
             4: {"desayuno": 0.25, "almuerzo": 0.35, "merienda": 0.15, "cena": 0.25},

@@ -537,6 +537,28 @@ async def receive_meals_per_day(update: Update, context: ContextTypes.DEFAULT_TY
     meals = int(query.data.split('_')[1])  # meals_4
     context.user_data['plan_data']['meals_per_day'] = meals
     
+    # Send distribution type keyboard
+    keyboard = keyboards.get_distribution_type_keyboard()
+    await query.edit_message_text(
+        "¿Cómo preferís distribuir las calorías y macronutrientes entre las comidas?\n\n"
+        "📊 **Tradicional**: Distribución variable (más calorías en almuerzo, menos en colaciones)\n"
+        "⚖️ **Equitativa**: Todas las comidas con la misma cantidad de calorías y macros",
+        reply_markup=keyboard,
+        parse_mode='Markdown'
+    )
+    
+    return States.DISTRIBUTION_TYPE
+
+
+async def receive_distribution_type(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Receive distribution type selection."""
+    query = update.callback_query
+    await query.answer()
+    
+    # Extract distribution type from callback data
+    dist_type = query.data.split('_')[1]  # dist_traditional or dist_equitable
+    context.user_data['plan_data']['distribution_type'] = dist_type
+    
     # Send snacks keyboard
     keyboard = keyboards.get_snacks_keyboard()
     await query.edit_message_text(
@@ -851,6 +873,7 @@ def get_new_plan_handler() -> ConversationHandler:
             States.DISLIKES: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_dislikes)],
             States.MEAL_SCHEDULE: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_meal_schedule)],
             States.MEALS_PER_DAY: [CallbackQueryHandler(receive_meals_per_day, pattern='^meals_')],
+            States.DISTRIBUTION_TYPE: [CallbackQueryHandler(receive_distribution_type, pattern='^dist_')],
             States.INCLUDE_SNACKS: [CallbackQueryHandler(receive_snacks_preference, pattern='^snack_')],
             States.ECONOMIC_LEVEL: [CallbackQueryHandler(receive_economic_level, pattern='^economic_')],
             States.FOOD_WEIGHT_TYPE: [CallbackQueryHandler(receive_food_weight_type, pattern='^weight_')],

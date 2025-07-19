@@ -42,7 +42,8 @@ TAREA: Genera un plan nutricional completo y personalizado para el siguiente pac
     nutritional_requirements.get('daily_calories', 2000),
     nutritional_requirements.get('carbs_percentage', 45) / 100,
     nutritional_requirements.get('protein_percentage', 25) / 100,
-    nutritional_requirements.get('fat_percentage', 30) / 100
+    nutritional_requirements.get('fat_percentage', 30) / 100,
+    patient_data.get('distribution_type', 'traditional')
 )}
 
 {cls.format_recipes_list(available_recipes)}
@@ -63,6 +64,9 @@ INSTRUCCIONES ESPECÍFICAS:
    - Asegura que cada día cumpla con las calorías objetivo (±5%)
    - Mantén la distribución de macronutrientes especificada EXACTAMENTE
    - IMPORTANTE: Cada comida debe respetar la distribución de macros indicada arriba
+   - CRÍTICO: Respeta el tipo de distribución seleccionado:
+     * DISTRIBUCIÓN EQUITATIVA: Todas las comidas tienen EXACTAMENTE las mismas calorías y macros
+     * DISTRIBUCIÓN TRADICIONAL: Sigue los porcentajes variables indicados
    - Para cada comida, calcula los gramos de cada macro según su porcentaje calórico
    - Si el paciente tiene nivel de proteína personalizado, respétalo estrictamente
    - Incluye todos los grupos de alimentos diariamente
