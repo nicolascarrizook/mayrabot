@@ -63,10 +63,10 @@ Especificaciones:
     def _format_macro_customization(patient_data: Dict[str, Any]) -> str:
         """Format macro customization information if present"""
         protein_level = patient_data.get('protein_level')
-        carbs_adjustment = patient_data.get('carbs_adjustment')
+        carbs_percentage = patient_data.get('carbs_percentage')
         fat_percentage = patient_data.get('fat_percentage')
         
-        if not protein_level and carbs_adjustment is None and not fat_percentage:
+        if not protein_level and carbs_percentage is None and not fat_percentage:
             return ""
         
         text = "Personalización de Macronutrientes:\n"
@@ -82,9 +82,8 @@ Especificaciones:
             }
             text += f"- Nivel de proteína: {protein_levels_text.get(protein_level, protein_level)}\n"
         
-        if carbs_adjustment is not None:
-            sign = "+" if carbs_adjustment > 0 else ""
-            text += f"- Ajuste de carbohidratos: {sign}{carbs_adjustment}%\n"
+        if carbs_percentage is not None:
+            text += f"- Porcentaje de carbohidratos: {carbs_percentage}%\n"
         
         if fat_percentage:
             text += f"- Porcentaje de grasas: {fat_percentage}%\n"
@@ -132,41 +131,64 @@ REQUERIMIENTOS NUTRICIONALES:
 """
 
     @staticmethod
-    def format_meal_distribution(meals_per_day: int) -> str:
-        """Format meal distribution throughout the day"""
-        distributions = {
-            3: """
-DISTRIBUCIÓN DE COMIDAS (3 comidas/día):
-- Desayuno: 30% de las calorías diarias (7:00-9:00)
-- Almuerzo: 40% de las calorías diarias (13:00-14:00)
-- Cena: 30% de las calorías diarias (20:00-21:00)
-""",
-            4: """
-DISTRIBUCIÓN DE COMIDAS (4 comidas/día):
-- Desayuno: 25% de las calorías diarias (7:00-9:00)
-- Almuerzo: 35% de las calorías diarias (13:00-14:00)
-- Merienda: 15% de las calorías diarias (17:00-18:00)
-- Cena: 25% de las calorías diarias (20:00-21:00)
-""",
-            5: """
-DISTRIBUCIÓN DE COMIDAS (5 comidas/día):
-- Desayuno: 20% de las calorías diarias (7:00-9:00)
-- Colación AM: 10% de las calorías diarias (10:30-11:00)
-- Almuerzo: 35% de las calorías diarias (13:00-14:00)
-- Merienda: 15% de las calorías diarias (17:00-18:00)
-- Cena: 20% de las calorías diarias (20:00-21:00)
-""",
-            6: """
-DISTRIBUCIÓN DE COMIDAS (6 comidas/día):
-- Desayuno: 20% de las calorías diarias (7:00-9:00)
-- Colación AM: 10% de las calorías diarias (10:30-11:00)
-- Almuerzo: 30% de las calorías diarias (13:00-14:00)
-- Merienda: 10% de las calorías diarias (16:00-17:00)
-- Cena: 20% de las calorías diarias (20:00-21:00)
-- Colación PM: 10% de las calorías diarias (22:00)
-"""
+    def format_meal_distribution(meals_per_day: int, daily_calories: int = 2000, 
+                               carbs_percent: float = 0.45, protein_percent: float = 0.25, 
+                               fat_percent: float = 0.30) -> str:
+        """Format meal distribution throughout the day with macros breakdown"""
+        
+        # Calculate total daily macros
+        total_carbs_g = round((daily_calories * carbs_percent) / 4)
+        total_protein_g = round((daily_calories * protein_percent) / 4)
+        total_fat_g = round((daily_calories * fat_percent) / 9)
+        
+        # Meal percentages
+        meal_percentages = {
+            3: {"desayuno": 0.30, "almuerzo": 0.40, "cena": 0.30},
+            4: {"desayuno": 0.25, "almuerzo": 0.35, "merienda": 0.15, "cena": 0.25},
+            5: {"desayuno": 0.20, "colacion_am": 0.10, "almuerzo": 0.35, 
+                "merienda": 0.15, "cena": 0.20},
+            6: {"desayuno": 0.20, "colacion_am": 0.10, "almuerzo": 0.30,
+                "merienda": 0.10, "cena": 0.20, "colacion_pm": 0.10}
         }
-        return distributions.get(meals_per_day, distributions[4])
+        
+        percentages = meal_percentages.get(meals_per_day, meal_percentages[4])
+        
+        result = f"""
+DISTRIBUCIÓN DE COMIDAS ({meals_per_day} comidas/día):
+Calorías totales: {daily_calories} kcal
+Macros totales: {total_carbs_g}g carbs | {total_protein_g}g proteína | {total_fat_g}g grasa
+
+"""
+        
+        # Calculate for each meal
+        meal_times = {
+            "desayuno": "7:00-9:00",
+            "colacion_am": "10:30-11:00",
+            "almuerzo": "13:00-14:00",
+            "merienda": "16:00-17:00",
+            "cena": "20:00-21:00",
+            "colacion_pm": "22:00"
+        }
+        
+        for meal, percentage in percentages.items():
+            meal_calories = round(daily_calories * percentage)
+            meal_carbs_g = round(total_carbs_g * percentage)
+            meal_protein_g = round(total_protein_g * percentage)
+            meal_fat_g = round(total_fat_g * percentage)
+            
+            meal_carbs_kcal = meal_carbs_g * 4
+            meal_protein_kcal = meal_protein_g * 4
+            meal_fat_kcal = meal_fat_g * 9
+            
+            meal_name = meal.replace("_", " ").title()
+            result += f"""- {meal_name} ({meal_times.get(meal, "")}): {percentage*100:.0f}% = {meal_calories} kcal
+  → Carbohidratos: {meal_carbs_g}g ({meal_carbs_kcal} kcal)
+  → Proteínas: {meal_protein_g}g ({meal_protein_kcal} kcal)
+  → Grasas: {meal_fat_g}g ({meal_fat_kcal} kcal)
+
+"""
+        
+        return result.rstrip()
 
     @staticmethod
     def get_system_prompt() -> str:
@@ -278,7 +300,14 @@ FORMATO DE RESPUESTA JSON REQUERIDO (TRES DÍAS Y CARGA):
                     ],
                     "preparacion": "Preparación detallada en argentino...",
                     "calorias": 350,
-                    "macros": {"carbos": 55, "proteinas": 15, "grasas": 8}
+                    "macros": {
+                        "carbohidratos_g": 55,
+                        "carbohidratos_kcal": 220,
+                        "proteinas_g": 15,
+                        "proteinas_kcal": 60,
+                        "grasas_g": 8,
+                        "grasas_kcal": 72
+                    }
                 },
                 {"nombre": "Opción 2..."},
                 {"nombre": "Opción 3..."}
@@ -291,8 +320,11 @@ FORMATO DE RESPUESTA JSON REQUERIDO (TRES DÍAS Y CARGA):
     "totales_diarios": {
         "calorias": 2000,
         "proteinas_g": 125,
+        "proteinas_kcal": 500,
         "carbohidratos_g": 225,
-        "grasas_g": 67
+        "carbohidratos_kcal": 900,
+        "grasas_g": 67,
+        "grasas_kcal": 600
     },
     "recomendaciones_generales": [
         "Tomar 8-10 vasos de agua por día",

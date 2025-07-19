@@ -180,7 +180,14 @@ async def receive_objective(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     keyboard = keyboards.get_macro_customization_keyboard()
     await query.edit_message_text(
         "¿Querés personalizar la distribución de macronutrientes?\n\n"
-        "La distribución estándar se ajusta automáticamente según tu objetivo y condiciones de salud.",
+        "📊 Distribución estándar:\n"
+        "• Proteínas: Según tu nivel de actividad\n"
+        "• Carbohidratos: 45%\n"
+        "• Grasas: Se calcula para completar el 100%\n\n"
+        "Si personalizas, podrás elegir:\n"
+        "• Gramos de proteína por kg de peso\n"
+        "• Porcentaje exacto de carbohidratos\n"
+        "• Porcentaje de grasas o cálculo automático",
         reply_markup=keyboard
     )
     
@@ -197,7 +204,7 @@ async def receive_macro_customization(update: Update, context: ContextTypes.DEFA
     if choice == 'standard':
         # Use standard distribution, skip to activity type
         context.user_data['plan_data']['protein_level'] = None
-        context.user_data['plan_data']['carbs_adjustment'] = None
+        context.user_data['plan_data']['carbs_percentage'] = None
         context.user_data['plan_data']['fat_percentage'] = None
         
         # Send activity type keyboard
@@ -229,11 +236,15 @@ async def receive_protein_level(update: Update, context: ContextTypes.DEFAULT_TY
     protein_level = query.data.split('_', 1)[1]  # protein_muy_baja
     context.user_data['plan_data']['protein_level'] = protein_level
     
-    # Ask about carbs adjustment
-    keyboard = keyboards.get_carbs_adjustment_keyboard()
+    # Ask about carbs percentage
+    keyboard = keyboards.get_carbs_percentage_keyboard()
     await query.edit_message_text(
-        "¿Querés ajustar los carbohidratos?\n\n"
-        "El valor base se ajustará según el porcentaje que elijas.",
+        "¿Qué porcentaje de carbohidratos querés en tu plan?\n\n"
+        "🌾 Los carbohidratos serán el porcentaje que elijas del total de calorías diarias.\n\n"
+        "Recomendaciones:\n"
+        "• Bajo (5-25%): Dietas cetogénicas o low-carb\n"
+        "• Moderado (30-45%): Balance estándar\n"
+        "• Alto (50-65%): Deportistas de resistencia",
         reply_markup=keyboard
     )
     
@@ -251,9 +262,9 @@ async def receive_carbs_adjustment(update: Update, context: ContextTypes.DEFAULT
     
     await query.answer()
     
-    # Extract carbs adjustment from callback data
-    carbs_adjustment = int(query.data.split('_')[1])  # carbs_-20 -> -20
-    context.user_data['plan_data']['carbs_adjustment'] = carbs_adjustment
+    # Extract carbs percentage from callback data
+    carbs_percentage = int(query.data.split('_')[1])  # carbs_45 -> 45
+    context.user_data['plan_data']['carbs_percentage'] = carbs_percentage
     
     # Ask about fat percentage
     keyboard = keyboards.get_fat_percentage_keyboard()

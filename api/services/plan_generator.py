@@ -144,7 +144,7 @@ class PlanGeneratorService:
     def _calculate_macro_distribution(self, patient_data: PatientData) -> Dict[str, float]:
         """Calculate macronutrient distribution"""
         # Check if custom macros are provided
-        if patient_data.protein_level or patient_data.carbs_adjustment is not None or patient_data.fat_percentage:
+        if patient_data.protein_level or patient_data.carbs_percentage is not None or patient_data.fat_percentage:
             return self._calculate_custom_macro_distribution(patient_data)
         
         # Default distribution for Tres Días y Carga
@@ -184,8 +184,8 @@ class PlanGeneratorService:
         # Get daily calories for calculations
         daily_calories = self._calculate_daily_calories(patient_data)
         
-        # Calculate protein percentage based on level and body weight
-        protein_percentage = 0.25  # Default
+        # Step 1: Calculate protein percentage based on level and body weight
+        protein_percentage = 0.25  # Default if not specified
         
         if patient_data.protein_level:
             protein_g_per_kg = self._get_protein_grams_per_kg(patient_data.protein_level)
@@ -196,22 +196,18 @@ class PlanGeneratorService:
             # Cap protein percentage at reasonable levels
             protein_percentage = min(protein_percentage, 0.40)  # Max 40% protein
         
-        # Apply carbs adjustment if provided
-        base_carbs_percentage = 0.45
-        if patient_data.carbs_adjustment is not None:
-            # Convert adjustment to decimal (e.g., -20 becomes 0.8, +20 becomes 1.2)
-            adjustment_factor = 1 + (patient_data.carbs_adjustment / 100)
-            carbs_percentage = base_carbs_percentage * adjustment_factor
-            # Ensure carbs stay within reasonable bounds
-            carbs_percentage = max(0.20, min(0.65, carbs_percentage))
+        # Step 2: Use direct carbs percentage if provided
+        if patient_data.carbs_percentage is not None:
+            carbs_percentage = patient_data.carbs_percentage / 100  # Convert to decimal
         else:
-            carbs_percentage = base_carbs_percentage
+            # Default carbs if not specified
+            carbs_percentage = 0.45
         
-        # Calculate or use specified fat percentage
+        # Step 3: Calculate or use specified fat percentage
         if patient_data.fat_percentage:
             fat_percentage = patient_data.fat_percentage / 100
         else:
-            # Calculate remaining percentage for fats
+            # Calculate remaining percentage for fats to complete 100%
             fat_percentage = 1.0 - protein_percentage - carbs_percentage
         
         # Validate that macros sum to 100%
@@ -409,12 +405,50 @@ class PlanGeneratorService:
     
     def _calculate_day_macros(self, meals: Dict[str, Dict[str, Any]]) -> Dict[str, float]:
         """Calculate total macros for a day"""
-        totals = {"carbohydrates": 0, "proteins": 0, "fats": 0}
+        totals = {
+            "carbohydrates": 0, 
+            "proteins": 0, 
+            "fats": 0,
+            "carbohydrates_g": 0,
+            "carbohydrates_kcal": 0,
+            "proteins_g": 0,
+            "proteins_kcal": 0,
+            "fats_g": 0,
+            "fats_kcal": 0
+        }
         
         for meal in meals.values():
             if "macros" in meal:
-                for macro, value in meal["macros"].items():
-                    totals[macro] += value
+                macros = meal["macros"]
+                # Handle both old and new format
+                if "carbohidratos_g" in macros:
+                    # New format
+                    totals["carbohydrates_g"] += macros.get("carbohidratos_g", 0)
+                    totals["carbohydrates_kcal"] += macros.get("carbohidratos_kcal", 0)
+                    totals["proteins_g"] += macros.get("proteinas_g", 0)
+                    totals["proteins_kcal"] += macros.get("proteinas_kcal", 0)
+                    totals["fats_g"] += macros.get("grasas_g", 0)
+                    totals["fats_kcal"] += macros.get("grasas_kcal", 0)
+                    # Also update old format for compatibility
+                    totals["carbohydrates"] = totals["carbohydrates_g"]
+                    totals["proteins"] = totals["proteins_g"]
+                    totals["fats"] = totals["fats_g"]
+                else:
+                    # Old format - calculate kcal
+                    carbs_g = macros.get("carbohydrates", macros.get("carbos", 0))
+                    proteins_g = macros.get("proteins", macros.get("proteinas", 0))
+                    fats_g = macros.get("fats", macros.get("grasas", 0))
+                    
+                    totals["carbohydrates"] += carbs_g
+                    totals["proteins"] += proteins_g
+                    totals["fats"] += fats_g
+                    
+                    totals["carbohydrates_g"] += carbs_g
+                    totals["carbohydrates_kcal"] += carbs_g * 4
+                    totals["proteins_g"] += proteins_g
+                    totals["proteins_kcal"] += proteins_g * 4
+                    totals["fats_g"] += fats_g
+                    totals["fats_kcal"] += fats_g * 9
         
         return totals
     

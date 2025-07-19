@@ -267,34 +267,30 @@ def get_protein_level_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(keyboard)
 
 
-def get_carbs_adjustment_keyboard() -> InlineKeyboardMarkup:
-    """Get carbs adjustment keyboard."""
+def get_carbs_percentage_keyboard() -> InlineKeyboardMarkup:
+    """Get carbs percentage keyboard (direct percentage of total calories)."""
     keyboard = []
     
-    # Reducir carbohidratos
-    keyboard.append([InlineKeyboardButton("⬇️ Reducir carbohidratos", callback_data='carbs_header')])
+    # Low carb options
+    keyboard.append([InlineKeyboardButton("🥑 Bajo en carbohidratos", callback_data='carbs_header')])
     row = []
-    for i in range(-50, 0, 10):
+    for i in range(5, 30, 5):
         row.append(InlineKeyboardButton(f"{i}%", callback_data=f'carbs_{i}'))
-        if len(row) == 3:
-            keyboard.append(row)
-            row = []
-    if row:
-        keyboard.append(row)
+    keyboard.append(row)
     
-    # Mantener normal
-    keyboard.append([InlineKeyboardButton("✅ Mantener normal (0%)", callback_data='carbs_0')])
-    
-    # Aumentar carbohidratos
-    keyboard.append([InlineKeyboardButton("⬆️ Aumentar carbohidratos", callback_data='carbs_header')])
+    # Moderate carb options
+    keyboard.append([InlineKeyboardButton("🌾 Moderado en carbohidratos", callback_data='carbs_header')])
     row = []
-    for i in range(10, 55, 10):
-        row.append(InlineKeyboardButton(f"+{i}%", callback_data=f'carbs_{i}'))
-        if len(row) == 3:
-            keyboard.append(row)
-            row = []
-    if row:
-        keyboard.append(row)
+    for i in range(30, 50, 5):
+        row.append(InlineKeyboardButton(f"{i}%", callback_data=f'carbs_{i}'))
+    keyboard.append(row)
+    
+    # High carb options
+    keyboard.append([InlineKeyboardButton("🍞 Alto en carbohidratos", callback_data='carbs_header')])
+    row = []
+    for i in range(50, 70, 5):
+        row.append(InlineKeyboardButton(f"{i}%", callback_data=f'carbs_{i}'))
+    keyboard.append(row)
     
     return InlineKeyboardMarkup(keyboard)
 

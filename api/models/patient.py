@@ -117,7 +117,7 @@ class PatientData(BaseModel):
     personal_notes: Optional[str] = Field(None, description="Notas personales")
     
     # Macro customization
-    carbs_adjustment: Optional[int] = Field(None, ge=-50, le=50, description="Ajuste de carbohidratos en % (-50 a +50)")
+    carbs_percentage: Optional[int] = Field(None, ge=5, le=65, description="Porcentaje de carbohidratos del total calórico (5-65%)")
     protein_level: Optional[ProteinLevel] = Field(None, description="Nivel de proteína según actividad y salud")
     fat_percentage: Optional[int] = Field(None, ge=15, le=45, description="Porcentaje específico de grasas")
     
@@ -128,10 +128,10 @@ class PatientData(BaseModel):
             raise ValueError(f'Duration must be one of: {valid_durations}')
         return v
     
-    @validator('carbs_adjustment')
-    def validate_carbs_adjustment(cls, v):
+    @validator('carbs_percentage')
+    def validate_carbs_percentage(cls, v):
         if v is not None and v % 5 != 0:
-            raise ValueError('Carbs adjustment must be in intervals of 5 (-50, -45, -40, ..., 45, 50)')
+            raise ValueError('Carbs percentage must be in intervals of 5 (5, 10, 15, ..., 60, 65)')
         return v
     
     @validator('activity_level', pre=True, always=True)

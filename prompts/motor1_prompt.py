@@ -37,7 +37,13 @@ TAREA: Genera un plan nutricional completo y personalizado para el siguiente pac
 
 {cls.format_nutritional_requirements(nutritional_requirements)}
 
-{cls.format_meal_distribution(patient_data.get('meals_per_day', 4))}
+{cls.format_meal_distribution(
+    patient_data.get('meals_per_day', 4),
+    nutritional_requirements.get('daily_calories', 2000),
+    nutritional_requirements.get('carbs_percentage', 45) / 100,
+    nutritional_requirements.get('protein_percentage', 25) / 100,
+    nutritional_requirements.get('fat_percentage', 30) / 100
+)}
 
 {cls.format_recipes_list(available_recipes)}
 
@@ -56,9 +62,13 @@ INSTRUCCIONES ESPECÍFICAS:
 2. BALANCE NUTRICIONAL:
    - Asegura que cada día cumpla con las calorías objetivo (±5%)
    - Mantén la distribución de macronutrientes especificada EXACTAMENTE
+   - IMPORTANTE: Cada comida debe respetar la distribución de macros indicada arriba
+   - Para cada comida, calcula los gramos de cada macro según su porcentaje calórico
    - Si el paciente tiene nivel de proteína personalizado, respétalo estrictamente
    - Incluye todos los grupos de alimentos diariamente
    - Verifica que los macros sumen 100% y respeten las especificaciones
+   - Los porcentajes de macros son del total calórico diario
+   - Cada comida debe incluir gramos específicos de proteína, carbohidratos y grasas
 
 3. CONSIDERACIONES MÉDICAS:
 {cls._format_medical_considerations(patient_data)}
@@ -71,6 +81,10 @@ INSTRUCCIONES ESPECÍFICAS:
    - Especifica cantidades exactas en gramos o unidades
    - Incluye tips nutricionales relevantes para cada comida
    - Sugiere horarios apropiados para cada comida
+   - Para cada comida, incluye SIEMPRE:
+     * Gramos de carbohidratos y sus kcal (1g = 4 kcal)
+     * Gramos de proteínas y sus kcal (1g = 4 kcal)
+     * Gramos de grasas y sus kcal (1g = 9 kcal)
 
 6. LISTA DE COMPRAS:
    - Genera una lista de compras consolidada para toda la semana
