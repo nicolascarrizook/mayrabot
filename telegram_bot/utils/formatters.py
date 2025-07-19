@@ -81,21 +81,28 @@ def format_meal_plan(plan_data: Dict[str, Any]) -> List[str]:
     """Format meal plan response into Telegram messages."""
     messages = []
     
+    # Escape dynamic values for MarkdownV2
+    patient_name = escape_markdown(str(plan_data.get('patient_name', 'N/A')))
+    total_calories = escape_markdown(str(plan_data.get('total_calories', plan_data.get('daily_calories', 'N/A'))))
+    bmi = escape_markdown(str(plan_data.get('bmi', 'N/A')))
+    bmi_category = escape_markdown(str(plan_data.get('bmi_category', 'N/A')))
+    total_days = escape_markdown(str(plan_data.get('total_days', 'N/A')))
+    
     # Header message
     header = f"""
-{settings.EMOJI_SUCCESS} **Plan Nutricional Generado**
+{settings.EMOJI_SUCCESS} *Plan Nutricional Generado*
 
-📊 **Información General:**
-- Paciente: {plan_data.get('patient_name', 'N/A')}
-- Calorías diarias: {plan_data.get('total_calories', plan_data.get('daily_calories', 'N/A'))} kcal
-- IMC: {plan_data.get('bmi', 'N/A')} ({plan_data.get('bmi_category', 'N/A')})
-- Plan de {plan_data.get('total_days', 'N/A')} días (Método Tres Días y Carga)
+📊 *Información General:*
+\\- Paciente: {patient_name}
+\\- Calorías diarias: {total_calories} kcal
+\\- IMC: {bmi} \\({bmi_category}\\)
+\\- Plan de {total_days} días \\(Método Tres Días y Carga\\)
 """
     messages.append(header)
     
     # Check if meal data is included
     if 'meals' in plan_data and plan_data['meals']:
-        meals_message = "\n🍽️ **Tu Plan de Comidas (se repite los 3 días):**\n"
+        meals_message = "\n🍽️ *Tu Plan de Comidas \(se repite los 3 días\):*\n"
         
         # Log for debugging
         logger.info(f"Meals data received: {list(plan_data['meals'].keys())}")
@@ -116,45 +123,58 @@ def format_meal_plan(plan_data: Dict[str, Any]) -> List[str]:
                 meal = plan_data['meals'][meal_type]
                 meal_emoji = get_meal_emoji(meal_type)
                 
-                meals_message += f"\n{meal_emoji} **{meal_names.get(meal_type, meal_type.title())}**\n"
+                meal_name = escape_markdown(meal_names.get(meal_type, meal_type.title()))
+                meals_message += f"\n{meal_emoji} *{meal_name}*\n"
                 
                 if meal.get('name'):
-                    meals_message += f"📝 {meal['name']}\n"
+                    recipe_name = escape_markdown(str(meal['name']))
+                    meals_message += f"📝 {recipe_name}\n"
                 
                 if meal.get('ingredients'):
-                    meals_message += "🥗 **Ingredientes:**\n"
+                    meals_message += "🥗 *Ingredientes:*\n"
                     for ingredient in meal['ingredients']:
                         if isinstance(ingredient, dict):
-                            meals_message += f"  • {ingredient.get('alimento', ingredient.get('name', ''))} - {ingredient.get('cantidad', ingredient.get('quantity', ''))}\n"
+                            ing_name = escape_markdown(str(ingredient.get('alimento', ingredient.get('name', ''))))
+                            ing_quantity = escape_markdown(str(ingredient.get('cantidad', ingredient.get('quantity', ''))))
+                            meals_message += f"  • {ing_name} \- {ing_quantity}\n"
                         else:
-                            meals_message += f"  • {ingredient}\n"
+                            ing_text = escape_markdown(str(ingredient))
+                            meals_message += f"  • {ing_text}\n"
                 
                 if meal.get('preparation'):
-                    prep_text = meal['preparation']
+                    prep_text = str(meal['preparation'])
                     # Truncate if too long
                     if len(prep_text) > 200:
                         prep_text = prep_text[:197] + "..."
-                    meals_message += f"👨‍🍳 **Preparación:** {prep_text}\n"
+                    prep_text = escape_markdown(prep_text)
+                    meals_message += f"👨‍🍳 *Preparación:* {prep_text}\n"
                 
                 if meal.get('calories'):
-                    meals_message += f"🔥 **Calorías:** {meal['calories']} kcal\n"
+                    calories = escape_markdown(str(meal['calories']))
+                    meals_message += f"🔥 *Calorías:* {calories} kcal\n"
                 
                 if meal.get('macros'):
                     macros = meal['macros']
-                    meals_message += f"📊 **Macros:** Carb: {macros.get('carbohydrates', 0)}g | Prot: {macros.get('proteins', 0)}g | Grasas: {macros.get('fats', 0)}g\n"
+                    carb = escape_markdown(str(macros.get('carbohydrates', 0)))
+                    prot = escape_markdown(str(macros.get('proteins', 0)))
+                    fats = escape_markdown(str(macros.get('fats', 0)))
+                    meals_message += f"📊 *Macros:* Carb: {carb}g \| Prot: {prot}g \| Grasas: {fats}g\n"
         
         messages.append(meals_message)
     else:
         # No meal data received
         logger.warning("No meal data received in plan_data")
+        meals_per_day = escape_markdown(str(plan_data.get('plan_summary', {}).get('meals_per_day', 4)))
+        total_cal = escape_markdown(str(plan_data.get('total_calories', plan_data.get('daily_calories', 'N/A'))))
+        
         no_meals_message = f"""
-🍽️ **Tu Plan de Comidas:**
+🍽️ *Tu Plan de Comidas:*
 
-{settings.EMOJI_INFO} El detalle completo de las comidas está siendo procesado y estará disponible en el PDF.
+{settings.EMOJI_INFO} El detalle completo de las comidas está siendo procesado y estará disponible en el PDF\.
 
 Por ahora, tu plan incluye:
-- {plan_data.get('plan_summary', {}).get('meals_per_day', 4)} comidas principales al día
-- Total de calorías diarias: {plan_data.get('total_calories', plan_data.get('daily_calories', 'N/A'))} kcal
+\- {meals_per_day} comidas principales al día
+\- Total de calorías diarias: {total_cal} kcal
 
 El PDF contendrá:
 ✅ Todas las recetas detalladas
@@ -166,21 +186,28 @@ El PDF contendrá:
         messages.append(no_meals_message)
     
     # Summary message
+    meals_per_day_sum = escape_markdown(str(plan_data['plan_summary']['meals_per_day']))
+    economic_level = escape_markdown(str(plan_data['plan_summary']['economic_level']))
+    pathologies = escape_markdown(', '.join(plan_data['plan_summary']['pathologies']) if plan_data['plan_summary']['pathologies'] else 'Ninguna')
+    allergies = escape_markdown(', '.join(plan_data['plan_summary']['allergies']) if plan_data['plan_summary']['allergies'] else 'Ninguna')
+    extra_message = escape_markdown(str(plan_data.get('message', '')))
+    
     summary_message = f"""
-📋 **Resumen del Plan:**
-- Comidas por día: {plan_data['plan_summary']['meals_per_day']}
-- Nivel económico: {plan_data['plan_summary']['economic_level']}
-- Patologías consideradas: {', '.join(plan_data['plan_summary']['pathologies']) if plan_data['plan_summary']['pathologies'] else 'Ninguna'}
-- Alergias consideradas: {', '.join(plan_data['plan_summary']['allergies']) if plan_data['plan_summary']['allergies'] else 'Ninguna'}
+📋 *Resumen del Plan:*
+\- Comidas por día: {meals_per_day_sum}
+\- Nivel económico: {economic_level}
+\- Patologías consideradas: {pathologies}
+\- Alergias consideradas: {allergies}
 
-📄 Tu plan nutricional completo con todas las opciones está siendo generado en formato PDF.
-{plan_data.get('message', '')}
+📄 Tu plan nutricional completo con todas las opciones está siendo generado en formato PDF\.
+{extra_message}
 """
     messages.append(summary_message)
     
     # Add recommendations if present
     if 'recommendations' in plan_data:
-        rec_message = f"\n{settings.EMOJI_INFO} **Recomendaciones:**\n{plan_data['recommendations']}"
+        recommendations = escape_markdown(str(plan_data['recommendations']))
+        rec_message = f"\n{settings.EMOJI_INFO} *Recomendaciones:*\n{recommendations}"
         messages.append(rec_message)
     
     return messages
