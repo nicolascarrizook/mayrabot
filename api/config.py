@@ -50,6 +50,11 @@ class Settings(BaseSettings):
         "vegetales": 25
     }
     
+    # Recipe Validation Configuration
+    strict_recipe_validation: bool = True  # Validate all recipes exist in DB
+    reject_invalid_recipes: bool = False   # Reject plan if contains invalid recipes
+    log_recipe_validation: bool = True     # Log validation details
+    
     class Config:
         env_file = ".env"
         case_sensitive = False

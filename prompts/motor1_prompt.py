@@ -43,11 +43,15 @@ TAREA: Genera un plan nutricional completo y personalizado para el siguiente pac
 
 INSTRUCCIONES ESPECÍFICAS:
 
-1. SELECCIÓN DE RECETAS:
-   - Usa ÚNICAMENTE las recetas proporcionadas en la lista
+1. SELECCIÓN DE RECETAS - CRÍTICO:
+   ⚠️ ADVERTENCIA: SOLO puedes usar las recetas EXACTAS de la lista proporcionada
+   - Usa ÚNICAMENTE las recetas proporcionadas en la lista - NO INVENTES NUEVAS
+   - Los nombres de las recetas deben coincidir EXACTAMENTE con los de la lista
+   - Si necesitas una receta y no está en la lista, elige la más similar disponible
    - Varía las recetas durante los {patient_data.get('days_requested', 7)} días
    - No repitas la misma receta más de 2 veces por semana
    - Considera el nivel económico "{patient_data.get('economic_level', 'standard')}"
+   - NUNCA crees recetas que no estén en la lista proporcionada
 
 2. BALANCE NUTRICIONAL:
    - Asegura que cada día cumpla con las calorías objetivo (±5%)

@@ -59,11 +59,24 @@ Especificaciones:
         if not recipes:
             return "No se encontraron recetas disponibles."
         
-        recipes_text = "RECETAS DISPONIBLES:\n\n"
+        recipes_text = "RECETAS DISPONIBLES (SOLO PUEDES USAR ESTAS):\n"
+        recipes_text += "=" * 60 + "\n\n"
+        
         for i, recipe in enumerate(recipes, 1):
-            recipes_text += f"{i}. {recipe.get('metadata', {}).get('recipe_name', 'Sin nombre')}\n"
-            recipes_text += f"   Categoría: {recipe.get('metadata', {}).get('category', 'Sin categoría')}\n"
-            recipes_text += f"   Contenido: {recipe.get('content', '')[:200]}...\n\n"
+            recipe_name = recipe.get('metadata', {}).get('recipe_name', 'Sin nombre')
+            calories = recipe.get('metadata', {}).get('calories', 'No especificado')
+            category = recipe.get('metadata', {}).get('category', 'Sin categoría')
+            meal_types = recipe.get('metadata', {}).get('meal_types', '[]')
+            
+            recipes_text += f"{i}. NOMBRE EXACTO: {recipe_name}\n"
+            recipes_text += f"   Calorías: {calories} kcal\n"
+            recipes_text += f"   Categoría: {category}\n"
+            recipes_text += f"   Tipos de comida: {meal_types}\n"
+            recipes_text += f"   Contenido: {recipe.get('content', '')[:150]}...\n"
+            recipes_text += "-" * 40 + "\n"
+        
+        recipes_text += "\n⚠️ IMPORTANTE: Debes usar EXACTAMENTE estos nombres de recetas.\n"
+        recipes_text += "No modifiques los nombres ni crees recetas nuevas.\n"
         
         return recipes_text
 
@@ -141,11 +154,18 @@ FORMATO DE PLANES:
 - Incluir forma de preparación
 - Respetar el método al pie de la letra
 
-IMPORTANTE:
+IMPORTANTE - RESTRICCIONES ABSOLUTAS:
 - SOLO usa las recetas proporcionadas en la base de datos
-- NO inventes recetas nuevas
+- NO inventes recetas nuevas bajo NINGUNA circunstancia
+- ADVERTENCIA: Cualquier receta no presente en la lista proporcionada será RECHAZADA automáticamente
+- Si no encuentras una receta adecuada, usa ÚNICAMENTE las opciones disponibles
+- Cada receta DEBE coincidir EXACTAMENTE con el nombre en la lista proporcionada
 - Respeta el método Tres Días y Carga estrictamente
-- Mantén el léxico argentino en todo momento"""
+- Mantén el léxico argentino en todo momento
+
+VALIDACIÓN:
+El sistema validará que TODAS las recetas existan en la base de datos.
+Las recetas inventadas serán sustituidas o rechazadas."""
 
     @staticmethod
     def format_json_response_schema(schema_type: str) -> str:

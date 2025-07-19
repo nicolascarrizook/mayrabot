@@ -49,6 +49,10 @@ class ChromaDBService:
         self._cache_ttl = 300  # 5 minutes cache
         self._last_cache_clear = None
         
+        # Initialize recipe validation cache
+        self._valid_recipes_cache = None
+        self._cache_timestamp = None
+        
         logger.info(f"ChromaDB service initialized with {self.collection.count()} documents")
     
     def search_recipes(
@@ -397,3 +401,61 @@ class ChromaDBService:
                 score += 10
         
         return score
+    
+    def get_all_valid_recipes(self, force_refresh: bool = False) -> Dict[str, Dict[str, Any]]:
+        """
+        Get all valid recipes from the database with caching
+        
+        Args:
+            force_refresh: Force refresh the cache
+            
+        Returns:
+            Dictionary of recipe_name -> recipe_data
+        """
+        import time
+        current_time = time.time()
+        
+        # Check if cache is valid
+        if (not force_refresh and 
+            self._valid_recipes_cache is not None and 
+            self._cache_timestamp is not None and
+            (current_time - self._cache_timestamp) < self._cache_ttl):
+            logger.info("Using cached valid recipes")
+            return self._valid_recipes_cache
+        
+        logger.info("Building valid recipes cache...")
+        
+        # Get all recipes from the collection
+        all_docs = self.collection.get()
+        valid_recipes = {}
+        
+        if all_docs and 'metadatas' in all_docs:
+            for i, metadata in enumerate(all_docs['metadatas']):
+                if metadata and 'recipe_name' in metadata:
+                    recipe_name = metadata['recipe_name']
+                    recipe_data = {
+                        'id': all_docs['ids'][i],
+                        'content': all_docs['documents'][i],
+                        'metadata': metadata
+                    }
+                    valid_recipes[recipe_name.lower()] = recipe_data
+        
+        # Update cache
+        self._valid_recipes_cache = valid_recipes
+        self._cache_timestamp = current_time
+        
+        logger.info(f"Valid recipes cache built with {len(valid_recipes)} recipes")
+        return valid_recipes
+    
+    def validate_recipe_exists(self, recipe_name: str) -> bool:
+        """
+        Quick validation to check if a recipe exists in the database
+        
+        Args:
+            recipe_name: Name of the recipe to validate
+            
+        Returns:
+            True if recipe exists, False otherwise
+        """
+        valid_recipes = self.get_all_valid_recipes()
+        return recipe_name.lower() in valid_recipes

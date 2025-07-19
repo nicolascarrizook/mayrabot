@@ -274,9 +274,16 @@ class RecipeSearcher:
                 preferences=patient_data.food_preferences
             )
             
-            # Log results
+            # Log results with recipe names
+            logger.info("=" * 60)
+            logger.info("RECIPE SEARCH RESULTS:")
             for meal_type, recipes in results.items():
-                logger.info(f"{meal_type}: Found {len(recipes)} recipes after optimization")
+                logger.info(f"\n{meal_type.upper()}: Found {len(recipes)} recipes")
+                for i, recipe in enumerate(recipes[:3], 1):  # Show top 3
+                    recipe_name = recipe.get('metadata', {}).get('recipe_name', 'Unknown')
+                    calories = self._get_recipe_calories(recipe)
+                    logger.info(f"  {i}. {recipe_name} ({calories} kcal)")
+            logger.info("=" * 60)
             
             return results
             
