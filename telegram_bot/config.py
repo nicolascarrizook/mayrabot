@@ -41,6 +41,16 @@ class Settings(BaseSettings):
     EMOJI_DINNER: str = "🌙"
     EMOJI_SNACK: str = "🥤"
     
+    # Secretary mode configuration
+    secretary_ids: Optional[str] = None  # Comma-separated list of authorized secretary telegram IDs
+    
+    @property
+    def secretary_ids_list(self):
+        """Get secretary IDs as list"""
+        if self.secretary_ids:
+            return [id.strip() for id in self.secretary_ids.split(',')]
+        return []
+    
     class Config:
         env_file = ".env"
         case_sensitive = True

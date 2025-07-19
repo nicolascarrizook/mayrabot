@@ -287,3 +287,6 @@ def _pathology_feedback(data: dict) -> str:
         return "\n".join(alerts) + "\n_Tu plan será adaptado a estas condiciones._"
     
     return None
+
+
+from typing import Any

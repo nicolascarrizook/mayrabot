@@ -8,14 +8,25 @@ from typing import List, Tuple
 from telegram_bot.config import settings
 
 
-def get_main_menu_keyboard() -> InlineKeyboardMarkup:
+def get_main_menu_keyboard(user_id: int = None) -> InlineKeyboardMarkup:
     """Get the main menu keyboard."""
     keyboard = [
         [InlineKeyboardButton(f"{settings.EMOJI_PLAN} Nuevo Plan Nutricional", callback_data='new_plan')],
         [InlineKeyboardButton(f"{settings.EMOJI_FOOD} Reemplazar Comida", callback_data='replace_meal')],
         [InlineKeyboardButton(f"{settings.EMOJI_INFO} Ayuda", callback_data='help')]
     ]
+    
+    # Add secretary mode for authorized users
+    if user_id and is_secretary(user_id):
+        keyboard.insert(0, [InlineKeyboardButton("👩‍💼 Modo Secretaria", callback_data='secretary_mode')])
+    
     return InlineKeyboardMarkup(keyboard)
+
+
+def is_secretary(user_id: int) -> bool:
+    """Check if user is authorized secretary."""
+    authorized_ids = settings.secretary_ids_list
+    return str(user_id) in authorized_ids
 
 
 def get_gender_keyboard() -> InlineKeyboardMarkup:

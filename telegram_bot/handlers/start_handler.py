@@ -33,7 +33,7 @@ Soy tu asistente nutricional personalizado. Puedo ayudarte a:
 ¿Qué te gustaría hacer hoy?
 """
     
-    keyboard = get_main_menu_keyboard()
+    keyboard = get_main_menu_keyboard(user.id)
     
     await update.message.reply_text(
         welcome_message,
@@ -65,9 +65,15 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await help_command(update, context)
         return States.SELECTING_ACTION
     
-    elif query.data == 'main_menu':
+    elif query.data == 'secretary_mode':
+        # Transition to secretary mode
+        from telegram_bot.handlers.secretary_mode import start_secretary_mode
+        return await start_secretary_mode(update, context)
+    
+    elif query.data == 'main_menu' or query.data == 'back_to_menu':
         # Return to main menu
-        keyboard = get_main_menu_keyboard()
+        user = update.effective_user
+        keyboard = get_main_menu_keyboard(user.id)
         await query.edit_message_text(
             "¿Qué te gustaría hacer?",
             reply_markup=keyboard

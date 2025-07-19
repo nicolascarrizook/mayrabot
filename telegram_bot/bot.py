@@ -28,7 +28,8 @@ from telegram_bot.handlers import (
     new_plan_handler,
     meal_replacement_handler,
     help_handler,
-    error_handler
+    error_handler,
+    secretary_mode
 )
 from telegram_bot.middleware.error_middleware import error_callback
 
@@ -61,6 +62,9 @@ def main() -> None:
     
     # Meal replacement conversation
     application.add_handler(meal_replacement_handler.get_meal_replacement_handler())
+    
+    # Secretary mode conversation
+    application.add_handler(secretary_mode.get_secretary_handler())
     
     # Cancel command (works globally)
     application.add_handler(CommandHandler("cancelar", start_handler.cancel))

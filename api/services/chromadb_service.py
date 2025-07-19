@@ -44,6 +44,11 @@ class ChromaDBService:
             model="text-embedding-3-small"
         )
         
+        # Initialize cache for frequently accessed data
+        self._cache = {}
+        self._cache_ttl = 300  # 5 minutes cache
+        self._last_cache_clear = None
+        
         logger.info(f"ChromaDB service initialized with {self.collection.count()} documents")
     
     def search_recipes(
@@ -247,3 +252,148 @@ class ChromaDBService:
         except Exception as e:
             logger.error(f"Error getting collection stats: {e}")
             raise
+    
+    def batch_search_recipes(
+        self,
+        meal_requirements: Dict[str, float],
+        patient_restrictions: List[str],
+        preferences: List[str] = None
+    ) -> Dict[str, List[Dict[str, Any]]]:
+        """
+        Optimized batch search for multiple meals at once
+        
+        Args:
+            meal_requirements: Dict of meal_type -> target_calories
+            patient_restrictions: List of ingredients to avoid
+            preferences: List of preferred ingredients
+            
+        Returns:
+            Dict of meal_type -> list of suitable recipes
+        """
+        import time
+        from concurrent.futures import ThreadPoolExecutor
+        
+        # Clear cache if needed
+        current_time = time.time()
+        if self._last_cache_clear is None or (current_time - self._last_cache_clear) > self._cache_ttl:
+            self._cache.clear()
+            self._last_cache_clear = current_time
+        
+        results = {}
+        
+        # Create search tasks
+        def search_for_meal(meal_type: str, target_calories: float):
+            cache_key = f"{meal_type}_{target_calories}_{hash(tuple(patient_restrictions))}"
+            
+            # Check cache first
+            if cache_key in self._cache:
+                logger.info(f"Cache hit for {meal_type}")
+                return meal_type, self._cache[cache_key]
+            
+            # Search with broader initial criteria
+            recipes = self.search_recipes(
+                query=meal_type,
+                n_results=30,  # Get more results for better filtering
+                filters={'meal_type': meal_type}
+            )
+            
+            # Filter by calories and restrictions
+            suitable_recipes = []
+            min_cal = target_calories * 0.8
+            max_cal = target_calories * 1.2
+            
+            for recipe in recipes:
+                # Get calories
+                calories = self._extract_calories(recipe)
+                if not (min_cal <= calories <= max_cal):
+                    continue
+                
+                # Check restrictions
+                if self._has_restrictions(recipe, patient_restrictions):
+                    continue
+                
+                # Score by preferences
+                score = self._score_by_preferences(recipe, preferences or [])
+                recipe['preference_score'] = score
+                
+                suitable_recipes.append(recipe)
+            
+            # Sort by preference score
+            suitable_recipes.sort(key=lambda x: x.get('preference_score', 0), reverse=True)
+            
+            # Cache results
+            self._cache[cache_key] = suitable_recipes[:10]
+            
+            return meal_type, suitable_recipes[:10]
+        
+        # Execute searches in parallel
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            futures = []
+            for meal_type, calories in meal_requirements.items():
+                future = executor.submit(search_for_meal, meal_type, calories)
+                futures.append(future)
+            
+            for future in futures:
+                meal_type, recipes = future.result()
+                results[meal_type] = recipes
+        
+        return results
+    
+    def _extract_calories(self, recipe: Dict[str, Any]) -> float:
+        """Extract calories from recipe with multiple fallbacks"""
+        # Direct field
+        if 'calories' in recipe:
+            return float(recipe['calories'])
+        
+        # From metadata
+        metadata = recipe.get('metadata', {})
+        if 'calories' in metadata:
+            return float(metadata['calories'])
+        if 'calorias' in metadata:
+            return float(metadata['calorias'])
+        
+        # From content parsing (last resort)
+        content = recipe.get('content', '')
+        import re
+        cal_match = re.search(r'(\d+)\s*(?:kcal|calorias|calorías)', content, re.IGNORECASE)
+        if cal_match:
+            return float(cal_match.group(1))
+        
+        return 0
+    
+    def _has_restrictions(self, recipe: Dict[str, Any], restrictions: List[str]) -> bool:
+        """Check if recipe contains restricted ingredients"""
+        if not restrictions:
+            return False
+        
+        # Get all text to search
+        search_text = []
+        search_text.append(recipe.get('content', ''))
+        search_text.append(str(recipe.get('metadata', {})))
+        
+        combined_text = ' '.join(search_text).lower()
+        
+        for restriction in restrictions:
+            if restriction.lower() in combined_text:
+                return True
+        
+        return False
+    
+    def _score_by_preferences(self, recipe: Dict[str, Any], preferences: List[str]) -> float:
+        """Score recipe based on patient preferences"""
+        if not preferences:
+            return 0
+        
+        score = 0
+        search_text = []
+        search_text.append(recipe.get('content', ''))
+        search_text.append(recipe.get('name', ''))
+        search_text.append(str(recipe.get('metadata', {})))
+        
+        combined_text = ' '.join(search_text).lower()
+        
+        for preference in preferences:
+            if preference.lower() in combined_text:
+                score += 10
+        
+        return score

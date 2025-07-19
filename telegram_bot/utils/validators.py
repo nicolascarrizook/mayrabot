@@ -127,3 +127,44 @@ def format_list_input(text: str) -> str:
     # Capitalize first letter of each item
     items = [item.strip().capitalize() for item in text.split(',')]
     return ', '.join(items)
+
+
+def validate_phone(phone: str) -> Tuple[bool, Optional[str]]:
+    """Validate phone number for secretary use."""
+    phone = re.sub(r'[\s\-\(\)]', '', phone)
+    
+    if not phone:
+        return False, "Por favor, ingresá un número de teléfono."
+    
+    # Accept various formats
+    if re.match(r'^\+?549?\d{10,}$', phone):
+        return True, None
+    
+    return False, "Por favor, ingresá un número de teléfono válido (ej: +5491112345678)."
+
+
+def validate_email(email: str) -> Tuple[bool, Optional[str]]:
+    """Validate email address."""
+    email = email.strip().lower()
+    
+    if not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email):
+        return False, "Por favor, ingresá un email válido."
+    
+    return True, None
+
+
+def validate_activity_level(activity_type: str, frequency: int, duration: int) -> str:
+    """Calculate activity level based on type, frequency and duration."""
+    if activity_type == 'sedentario':
+        return 'sedentary'
+    
+    total_minutes = frequency * duration
+    
+    if total_minutes < 150:
+        return 'light'
+    elif total_minutes < 300:
+        return 'moderate'
+    elif total_minutes < 450:
+        return 'active'
+    else:
+        return 'very_active'

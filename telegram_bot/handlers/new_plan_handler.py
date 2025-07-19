@@ -553,6 +553,16 @@ async def handle_confirmation(update: Update, context: ContextTypes.DEFAULT_TYPE
         else:
             context.user_data['plan_data']['gender'] = 'female'
         
+        # Calculate activity level if not set
+        if 'activity_level' not in context.user_data['plan_data']:
+            activity_type = context.user_data['plan_data'].get('activity_type', 'sedentario')
+            frequency = context.user_data['plan_data'].get('activity_frequency', 1)
+            duration = context.user_data['plan_data'].get('activity_duration', 30)
+            
+            context.user_data['plan_data']['activity_level'] = validators.validate_activity_level(
+                activity_type, frequency, duration
+            )
+        
         # Step 2: Recipe search phase
         await progress.update_progress(2, "Buscando las mejores recetas para tu perfil...")
         await asyncio.sleep(0.5)

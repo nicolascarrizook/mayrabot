@@ -239,47 +239,67 @@ class RecipeSearcher:
         meal_distribution: Dict[str, float]
     ) -> Dict[str, List[Dict[str, Any]]]:
         """
-        Find the best recipes for a complete meal plan
+        Find the best recipes for a complete meal plan using optimized batch search
         
         Returns:
             Dictionary with meal_type -> list of recipe options
         """
-        meal_types = list(meal_distribution.keys())
-        best_recipes = {}
+        logger.info("Starting optimized batch recipe search...")
+        
+        # Prepare meal requirements
+        meal_requirements = {
+            meal_type: daily_calories * distribution
+            for meal_type, distribution in meal_distribution.items()
+        }
         
         # Prepare restrictions list
-        all_restrictions = (
-            patient_data.food_dislikes +
-            patient_data.allergies +
-            [food for pathology in patient_data.pathologies 
-             for food in self._get_pathology_restrictions(pathology)]
-        )
+        all_restrictions = []
+        if patient_data.food_dislikes:
+            all_restrictions.extend(patient_data.food_dislikes)
+        if patient_data.allergies:
+            all_restrictions.extend(patient_data.allergies)
         
-        for meal_type in meal_types:
-            target_calories = daily_calories * meal_distribution[meal_type]
-            
-            criteria = RecipeSearchCriteria(
-                meal_type=meal_type,
-                target_calories=target_calories,
-                preferences=patient_data.food_preferences,
-                restrictions=all_restrictions,
-                allergies=patient_data.allergies,
-                economic_level=patient_data.economic_level.value,
-                max_results=5  # Get top 5 for each meal
+        # Add pathology-based restrictions
+        for pathology in patient_data.pathologies:
+            all_restrictions.extend(self._get_pathology_restrictions(pathology))
+        
+        # Remove duplicates
+        all_restrictions = list(set(all_restrictions))
+        
+        # Use optimized batch search
+        try:
+            results = self.chromadb.batch_search_recipes(
+                meal_requirements=meal_requirements,
+                patient_restrictions=all_restrictions,
+                preferences=patient_data.food_preferences
             )
             
-            recipes = await self.search_recipes_for_meal(criteria)
+            # Log results
+            for meal_type, recipes in results.items():
+                logger.info(f"{meal_type}: Found {len(recipes)} recipes after optimization")
             
-            if not recipes:
-                logger.warning(f"No recipes found for {meal_type}, using fallback search")
-                # Try with relaxed criteria
-                criteria.calorie_tolerance = 0.4  # ±40%
-                criteria.restrictions = patient_data.allergies  # Only hard restrictions
+            return results
+            
+        except Exception as e:
+            logger.error(f"Batch search failed: {e}, falling back to individual searches")
+            
+            # Fallback to individual searches
+            best_recipes = {}
+            for meal_type, calories in meal_requirements.items():
+                criteria = RecipeSearchCriteria(
+                    meal_type=meal_type,
+                    target_calories=calories,
+                    preferences=patient_data.food_preferences,
+                    restrictions=all_restrictions,
+                    allergies=patient_data.allergies,
+                    economic_level=patient_data.economic_level.value,
+                    max_results=5
+                )
+                
                 recipes = await self.search_recipes_for_meal(criteria)
+                best_recipes[meal_type] = recipes
             
-            best_recipes[meal_type] = recipes
-            
-        return best_recipes
+            return best_recipes
     
     def _get_pathology_restrictions(self, pathology: str) -> List[str]:
         """Get food restrictions based on pathology"""
